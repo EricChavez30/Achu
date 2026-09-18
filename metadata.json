@@ -1,0 +1,6 @@
+{
+  "name": "TikTok LIVE Overlay Prototype",
+  "description": "Prototipo de receptor de eventos TikTok LIVE en tiempo real para OBS Browser Source en formato 9:16, con soporte para conexión Webcast y modo simulación.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
