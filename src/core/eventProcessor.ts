@@ -12,7 +12,7 @@ import {
   EventTypeCounts,
 } from '../types/tiktok';
 
-export type EventListener = (event: NormalizedLiveEvent, stats: CumulativeStats) => void;
+export type EventListener = (event: NormalizedLiveEvent | null, stats: CumulativeStats) => void;
 
 const INITIAL_EVENT_COUNTS: EventTypeCounts = {
   likes: 0,
@@ -58,11 +58,24 @@ export class EventProcessor {
     };
     this.lastEvent = null;
     this.recentEvents = [];
+    this.notifyListeners(null);
   }
 
   public clearHistory() {
     this.recentEvents = [];
     this.lastEvent = null;
+    this.notifyListeners(null);
+  }
+
+  private notifyListeners(event: NormalizedLiveEvent | null) {
+    this.listeners.forEach((listener) => {
+      try {
+        // Pass dummy or last event along with updated stats
+        listener(event as any, this.getStats());
+      } catch (err) {
+        console.error('Error in event listener:', err);
+      }
+    });
   }
 
   public subscribe(listener: EventListener): () => void {
@@ -91,7 +104,6 @@ export class EventProcessor {
    * Main entry point to process any incoming normalized event
    */
   public processEvent(event: NormalizedLiveEvent): void {
-    this.lastEvent = event;
     this.stats.lastUpdated = event.timestamp;
     this.stats.eventCounts.total += 1;
 
@@ -127,24 +139,22 @@ export class EventProcessor {
         const data = event.data as ViewerCountData;
         this.stats.currentViewers = data.viewerCount;
         this.stats.eventCounts.viewers += 1;
-        break;
+        // Viewer count updates the HUD stats but should NOT displace interaction events
+        // nor flood the chat/event waterfall
+        this.notifyListeners(null);
+        return;
       }
     }
 
-    // Keep history ring buffer (newest first, maximum 50 events)
+    // Only genuine interaction events (like, gift, comment, follow) become lastEvent and feed items
+    this.lastEvent = event;
     this.recentEvents.unshift(event);
     if (this.recentEvents.length > this.maxHistory) {
       this.recentEvents.pop();
     }
 
     // Notify registered listeners
-    this.listeners.forEach((listener) => {
-      try {
-        listener(event, this.getStats());
-      } catch (err) {
-        console.error('Error in event listener:', err);
-      }
-    });
+    this.notifyListeners(event);
   }
 
   /**

@@ -24,7 +24,7 @@ npm -v
 echo.
 
 echo [1/2] Verificando e instalando dependencias de Node.js...
-call npm install
+call npm install --legacy-peer-deps
 if %ERRORLEVEL% neq 0 (
     echo [ERROR] Ocurrio un problema ejecutando npm install.
     pause

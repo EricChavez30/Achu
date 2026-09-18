@@ -48,7 +48,7 @@ export class SimulationEngine {
   private isRunning: boolean = false;
   private intervalTimer: any = null;
   private onEventCallback: ((event: NormalizedLiveEvent) => void) | null = null;
-  private currentViewers: number = 248;
+  private currentViewers: number = 8;
 
   constructor(onEvent?: (event: NormalizedLiveEvent) => void) {
     if (onEvent) this.onEventCallback = onEvent;
@@ -56,6 +56,10 @@ export class SimulationEngine {
 
   public setEventCallback(callback: (event: NormalizedLiveEvent) => void) {
     this.onEventCallback = callback;
+  }
+
+  public resetViewers(initial: number = 0) {
+    this.currentViewers = initial;
   }
 
   public start(intervalMs: number = 1800) {
@@ -105,8 +109,8 @@ export class SimulationEngine {
     } else if (rand < 0.97) {
       return this.triggerFollow();
     } else {
-      const delta = Math.floor(Math.random() * 11) - 5;
-      this.currentViewers = Math.max(10, this.currentViewers + delta);
+      const delta = Math.floor(Math.random() * 5) - 2;
+      this.currentViewers = Math.max(1, this.currentViewers + delta);
       return this.triggerViewerCount(this.currentViewers);
     }
   }

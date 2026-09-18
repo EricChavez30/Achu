@@ -50,8 +50,10 @@ export default function App() {
       setStats(updatedStats);
       setRecentEvents(processor.getRecentEvents());
 
-      // Update Game state stub without coupling to UI
-      gameState.registerPlayerInteraction(event);
+      // Update Game state stub without coupling to UI (only if there is a valid event)
+      if (event && event.user) {
+        gameState.registerPlayerInteraction(event);
+      }
     });
 
     // 2. Subscribe to Connection status changes
@@ -75,8 +77,11 @@ export default function App() {
 
   const handleClearEvents = () => {
     processor.clearHistory();
+    processor.resetStats();
+    gameState.resetGame();
     setRecentEvents([]);
     setLastEvent(null);
+    setStats(processor.getStats());
   };
 
   // If in clean OBS Browser Source mode, render just the 9:16 overlay

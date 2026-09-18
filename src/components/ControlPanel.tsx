@@ -163,6 +163,15 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
 
         <div className="flex items-center gap-2">
           <button
+            onClick={onClearEvents}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-rose-950/50 text-xs font-semibold text-rose-300 border border-slate-700 hover:border-rose-700/60 transition"
+            title="Limpiar todos los eventos del lienzo 9:16 y de la lista"
+          >
+            <RotateCcw className="w-3.5 h-3.5" />
+            <span>Limpiar Eventos</span>
+          </button>
+
+          <button
             onClick={onOpenDocs}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-semibold text-cyan-300 border border-slate-700 transition"
             title="Ver Arquitectura Técnica y Docs"

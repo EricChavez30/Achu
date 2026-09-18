@@ -260,7 +260,7 @@ export const EventDebugger: React.FC<EventDebuggerProps> = ({
             <Users className="w-3.5 h-3.5" />
           </div>
           <div>
-            <span className="block text-[9px] uppercase font-bold text-blue-300">Viewers</span>
+            <span className="block text-[9px] uppercase font-bold text-blue-300">Paquetes Viewers</span>
             <span className="text-sm font-black font-mono text-white">{eventCounts.viewers}</span>
           </div>
         </div>

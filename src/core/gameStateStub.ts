@@ -15,7 +15,11 @@ export class GameStateStub {
   /**
    * Registra o actualiza la actividad de un jugador cuando envía un evento
    */
-  public registerPlayerInteraction(event: NormalizedLiveEvent): PlayerProfile {
+  public registerPlayerInteraction(event?: NormalizedLiveEvent | null): PlayerProfile | null {
+    if (!event || !event.user || !event.user.uniqueId) {
+      return null;
+    }
+
     const userId = event.user.uniqueId;
     let player = this.players.get(userId);
 

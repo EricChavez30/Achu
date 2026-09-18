@@ -33,26 +33,30 @@ let connectionStatus: 'disconnected' | 'connecting' | 'connected' | 'error' = 'd
 let lastError: string | null = null;
 let currentRoomId: string | null = null;
 
-// Dynamically load WebcastPushConnection to prevent build failures if package has native issues
-let WebcastPushConnectionClass: any = null;
+// Dynamically load TikTokLiveConnection and configure routes to bypass EulerStream paid API requirement
+let TikTokLiveClass: any = null;
 async function getWebcastClass() {
-  if (!WebcastPushConnectionClass) {
+  if (!TikTokLiveClass) {
     try {
       // @ts-ignore
-      const mod = await import('tiktok-live-connector/legacy');
-      WebcastPushConnectionClass = mod.WebcastPushConnection;
-
-      // Disable Euler route fallback which requires paid API key and throws 403
-      // @ts-ignore
       const rootMod = await import('tiktok-live-connector');
-      if (rootMod?.RoomIdRouteConfig) {
+      TikTokLiveClass = rootMod.TikTokLiveConnection;
+
+      // Disable Euler stream route fallback which requires paid API key and throws 403
+      if (rootMod.RoomIdRouteConfig) {
         rootMod.RoomIdRouteConfig.skipFetchRoomIdFromEulerRoute = true;
+      }
+      if (rootMod.RouteConfig) {
+        // Return clean unsigned URL directly so TikTok doesn't redirect to paid EulerStream service
+        rootMod.RouteConfig.fetchWebcastSignatureFromProvider = async ({ url, userAgent }: any) => {
+          return { response: { signedUrl: url, userAgent } };
+        };
       }
     } catch (err) {
       console.error('Error importing tiktok-live-connector:', err);
     }
   }
-  return WebcastPushConnectionClass;
+  return TikTokLiveClass;
 }
 
 function broadcastSSE(data: any) {
@@ -172,72 +176,135 @@ app.post('/api/tiktok/connect', async (req, res) => {
 
     activeTiktokConnection = connection;
 
-    // Attach listeners with explicit terminal logging
+    // Attach listeners with explicit terminal logging & robust data extraction
     connection.on('chat', (data: any) => {
-      const author = data.uniqueId || data.nickname || 'anonimo';
-      console.log(`[TikTok] CHAT: @${author}: "${data.comment}"`);
+      const author = data.uniqueId || data.user?.displayId || data.user?.uniqueId || data.user?.nickname || data.nickname || 'anonimo';
+      const comment = data.comment || data.content || '';
+      const pfp = data.profilePictureUrl || data.user?.avatarThumb?.urlList?.[0] || data.user?.avatarMedium?.urlList?.[0] || '';
+      console.log(`[TikTok] CHAT: @${author}: "${comment}"`);
       broadcastEvent('chat', {
-        uniqueId: data.uniqueId,
-        nickname: data.nickname,
-        comment: data.comment,
-        profilePictureUrl: data.profilePictureUrl,
+        uniqueId: author,
+        nickname: data.nickname || data.user?.nickname || author,
+        comment: comment,
+        profilePictureUrl: pfp,
         user: data.user,
       });
     });
 
     connection.on('gift', (data: any) => {
-      const author = data.uniqueId || data.nickname || 'anonimo';
-      const repeat = data.repeatCount || 1;
-      const diamonds = (data.diamondCount || 0) * repeat;
-      console.log(`[TikTok] GIFT: @${author} sent ${data.giftName} x${repeat} (💎 ${diamonds} diamonds)`);
+      const author = data.uniqueId || data.user?.displayId || data.user?.uniqueId || data.user?.nickname || data.nickname || 'anonimo';
+      const giftName = data.giftName || data.giftDetails?.giftName || data.gift?.name || 'Regalo';
+      const repeat = Number(data.repeatCount || data.repeatEnd || 1);
+      const diamonds = Number(data.diamondCount || data.gift?.diamondCount || 0) * repeat;
+      const pfp = data.profilePictureUrl || data.user?.avatarThumb?.urlList?.[0] || '';
+      const giftImg = data.giftPictureUrl || data.gift?.image?.urlList?.[0] || '';
+      console.log(`[TikTok] GIFT: @${author} sent ${giftName} x${repeat} (💎 ${diamonds} diamonds)`);
       broadcastEvent('gift', {
-        uniqueId: data.uniqueId,
-        nickname: data.nickname,
-        giftId: data.giftId,
-        giftName: data.giftName,
-        diamondCount: data.diamondCount,
-        repeatCount: data.repeatCount,
-        profilePictureUrl: data.profilePictureUrl,
-        giftPictureUrl: data.giftPictureUrl,
+        uniqueId: author,
+        nickname: data.nickname || data.user?.nickname || author,
+        giftId: data.giftId || data.gift?.id,
+        giftName: giftName,
+        diamondCount: data.diamondCount || data.gift?.diamondCount || 0,
+        repeatCount: repeat,
+        profilePictureUrl: pfp,
+        giftPictureUrl: giftImg,
       });
     });
 
+    // Keep track of like debouncing and viewer updates
+    let lastViewerCount = 0;
+    let lastViewerBroadcastTime = 0;
+    // Debounce per user: wait 5.0 seconds after the user's latest like to combine all their rapid likes into a single alert
+    const userLikeBuffer = new Map<string, { timer: NodeJS.Timeout; count: number; total: any; nickname: string; pfp: string }>();
+
     connection.on('like', (data: any) => {
-      const author = data.uniqueId || data.nickname || 'anonimo';
-      console.log(`[TikTok] LIKE: @${author} sent ${data.likeCount || 1} likes (Total: ${data.totalLikeCount || 'N/A'})`);
-      broadcastEvent('like', {
-        uniqueId: data.uniqueId,
-        nickname: data.nickname,
-        likeCount: data.likeCount,
-        totalLikeCount: data.totalLikeCount,
-        profilePictureUrl: data.profilePictureUrl,
-      });
+      const author = data.uniqueId || data.user?.displayId || data.user?.uniqueId || data.user?.nickname || data.nickname || 'anonimo';
+      const likeCount = Number(data.likeCount || data.count || 1);
+      const totalLikes = data.totalLikeCount || data.total || 'N/A';
+      const pfp = data.profilePictureUrl || data.user?.avatarThumb?.urlList?.[0] || '';
+      const nickname = data.nickname || data.user?.nickname || author;
+
+      // Group rapid likes from the same user within 5 seconds into a single combined event
+      const existing = userLikeBuffer.get(author);
+      if (existing) {
+        clearTimeout(existing.timer);
+        existing.count += likeCount;
+        existing.total = totalLikes;
+        existing.timer = setTimeout(() => {
+          userLikeBuffer.delete(author);
+          console.log(`[TikTok] LIKE BATCH: @${author} sent total ${existing.count} likes`);
+          broadcastEvent('like', {
+            uniqueId: author,
+            nickname: existing.nickname,
+            likeCount: existing.count,
+            totalLikeCount: existing.total,
+            profilePictureUrl: existing.pfp,
+          });
+        }, 5000);
+      } else {
+        const timer = setTimeout(() => {
+          userLikeBuffer.delete(author);
+          console.log(`[TikTok] LIKE: @${author} sent ${likeCount} likes (Total: ${totalLikes})`);
+          broadcastEvent('like', {
+            uniqueId: author,
+            nickname: nickname,
+            likeCount: likeCount,
+            totalLikeCount: totalLikes,
+            profilePictureUrl: pfp,
+          });
+        }, 5000);
+
+        userLikeBuffer.set(author, {
+          timer,
+          count: likeCount,
+          total: totalLikes,
+          nickname,
+          pfp,
+        });
+      }
     });
 
     connection.on('follow', (data: any) => {
-      const author = data.uniqueId || data.nickname || 'anonimo';
+      const author = data.uniqueId || data.user?.displayId || data.user?.uniqueId || data.user?.nickname || data.nickname || 'anonimo';
       console.log(`[TikTok] FOLLOW: @${author} started following`);
       broadcastEvent('follow', {
-        uniqueId: data.uniqueId,
-        nickname: data.nickname,
-        profilePictureUrl: data.profilePictureUrl,
+        uniqueId: author,
+        nickname: data.nickname || data.user?.nickname || author,
+        profilePictureUrl: data.profilePictureUrl || data.user?.avatarThumb?.urlList?.[0] || '',
       });
     });
 
     connection.on('share', (data: any) => {
-      const author = data.uniqueId || data.nickname || 'anonimo';
+      const author = data.uniqueId || data.user?.displayId || data.user?.uniqueId || data.user?.nickname || data.nickname || 'anonimo';
       console.log(`[TikTok] SHARE: @${author} shared the stream`);
       broadcastEvent('share', {
-        uniqueId: data.uniqueId,
-        nickname: data.nickname,
+        uniqueId: author,
+        nickname: data.nickname || data.user?.nickname || author,
       });
     });
 
     connection.on('roomUser', (data: any) => {
-      console.log(`[TikTok] VIEWERS: ${data.viewerCount} live viewers`);
-      broadcastEvent('roomUser', {
-        viewerCount: data.viewerCount,
-      });
+      // In TikTok LIVE protobuf:
+      // 'viewerCount' or 'total' represents the current concurrent real-time viewers watching.
+      // 'totalUser' is cumulative unique visits since stream began (much larger number).
+      const viewers = Number(
+        (data.viewerCount !== undefined && data.viewerCount !== null)
+          ? data.viewerCount
+          : (data.total !== undefined && data.total !== null)
+            ? data.total
+            : (data.totalUser || 0)
+      );
+
+      const now = Date.now();
+      // Throttle viewer updates: only broadcast if count actually changed and at least 5s elapsed
+      if (viewers >= 0 && (viewers !== lastViewerCount || now - lastViewerBroadcastTime > 8000)) {
+        lastViewerCount = viewers;
+        lastViewerBroadcastTime = now;
+        console.log(`[TikTok] VIEWERS: ${viewers} live viewers (raw total=${data.total}, totalUser=${data.totalUser})`);
+        broadcastEvent('roomUser', {
+          viewerCount: viewers,
+        });
+      }
     });
 
     connection.on('streamEnd', () => {
@@ -253,7 +320,8 @@ app.post('/api/tiktok/connect', async (req, res) => {
     });
 
     connection.on('error', (err: any) => {
-      console.error(`[TikTok] Error: ${err?.message || err}`);
+      const errMsg = err?.message || (typeof err === 'object' ? JSON.stringify(err) : String(err));
+      console.error(`[TikTok] Error: ${errMsg}`);
     });
 
     // Initiate connection (with optional direct numeric room ID)
@@ -299,12 +367,18 @@ app.post('/api/tiktok/connect', async (req, res) => {
       isIpBlocked = true;
     }
 
-    // Pass the real technical error directly so it's not hidden
-    broadcastStatus('error', rawTechnicalError);
+    const friendlyErrorMessage = isOffline
+      ? `@${cleanTarget} no se encuentra transmitiendo en vivo en este momento (Offline), o la cuenta no tiene un directo activo.`
+      : isIpBlocked
+        ? `TikTok bloqueó la solicitud desde los servidores en la nube. Ejecuta la aplicación en tu PC local (iniciar-en-windows.bat) con tu IP residencial.`
+        : rawTechnicalError;
+
+    // Pass friendly message for UI and keep technical details
+    broadcastStatus('error', friendlyErrorMessage);
     return res.status(200).json({
       success: false,
       technicalError: rawTechnicalError,
-      message: rawTechnicalError,
+      message: friendlyErrorMessage,
       isOffline,
       isIpBlocked,
       rawError: rawTechnicalError,
