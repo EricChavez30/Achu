@@ -1,47 +1,69 @@
 @echo off
-title TikTok LIVE Prototype - Local Windows Server
-color 0B
-echo =====================================================================
-echo   TIKTOK LIVE PROTOTYPE - SERVIDOR LOCAL WINDOWS
-echo   Conexion directa mediante tiktok-live-connector (IP Residencial)
-echo =====================================================================
+title TikTok LIVE Server
+cd /d "%~dp0"
+echo ===================================================
+echo     TIKTOK LIVE SERVER - DIAGNOSTICO Y ARRANQUE
+echo ===================================================
+echo.
+echo Carpeta actual: %CD%
 echo.
 
-:: Verificar si Node.js esta instalado en el sistema
-where node >nul 2>nul
-if %ERRORLEVEL% neq 0 (
-    echo [ERROR] Node.js no esta instalado en tu PC Windows.
-    echo Por favor descarga la version LTS (v20 o v22) desde:
-    echo https://nodejs.org
-    echo.
-    pause
-    exit /b 1
+node -v >nul 2>nul
+if errorlevel 1 (
+    echo [ERROR] No se encuentra Node.js en esta ventana.
+    echo Buscando en carpetas tipicas de Windows...
+    if exist "%ProgramFiles%
+odejs
+ode.exe" (
+        set "PATH=%ProgramFiles%
+odejs;%PATH%"
+        echo Encontrado en Program Files!
+    ) else if exist "%LocalAppData%\Programs
+ode
+ode.exe" (
+        set "PATH=%LocalAppData%\Programs
+ode;%PATH%"
+        echo Encontrado en LocalAppData!
+    ) else (
+        echo [ERROR CRITICO] Node.js no esta instalado en este equipo.
+        echo Por favor instala Node.js desde: https://nodejs.org
+        echo.
+        pause
+        exit /b 1
+    )
 )
 
-echo [OK] Node.js detectado:
-node -v
-npm -v
+echo [OK] Version de Node instalada:
+call node -v
+echo [OK] Version de NPM:
+call npm -v
 echo.
 
-echo [1/2] Verificando e instalando dependencias de Node.js...
-call npm install --legacy-peer-deps
-if %ERRORLEVEL% neq 0 (
-    echo [ERROR] Ocurrio un problema ejecutando npm install.
-    pause
-    exit /b 1
+if not exist "node_modules" (
+    echo [1/2] Instalando dependencias necesarias...
+    echo Esto se hace una sola vez y tardara unos segundos...
+    call npm install --legacy-peer-deps
+    if errorlevel 1 (
+        echo.
+        echo [ERROR] Fallo la instalacion de paquetes npm.
+        pause
+        exit /b 1
+    )
+) else (
+    echo [1/2] Dependencias ya listas en node_modules.
 )
 
 echo.
-echo [2/2] Levantando Servidor Full-Stack (Backend Express + Frontend Vite)...
-echo Servidor escuchando en: http://localhost:3000
+echo [2/2] Iniciando servidor Express + Vite...
+echo Panel de control: http://localhost:3000
+echo Overlay para OBS: http://localhost:3000/overlay
 echo.
-echo Cuenta de prueba predeterminada: @ERIC_ACHU
-echo Eventos detectados: Chat, Likes, Regalos, Follows, Viewers
-echo.
-echo Presiona Ctrl + C en esta ventana cuando desees detener el servidor.
+echo Presiona Ctrl + C para detener el servidor.
+echo ===================================================
 echo.
 
 call npm run dev
 
+echo.
+echo El servidor se ha cerrado.
 pause
-

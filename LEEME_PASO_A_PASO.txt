@@ -1,0 +1,75 @@
+================================================================================
+      TIKTOK LIVE OVERLAY & JUEGO INTERACTIVO - GUIA DE CONSOLA (TERMINAL)
+================================================================================
+
++------------------------------------------------------------------------------+
+|                         ENLACES EN TU NAVEGADOR Y OBS                        |
++------------------------------------------------------------------------------+
+|                                                                              |
+|  [PANEL DE CONTROL]       >>>   http://localhost:3000                        |
+|  (Para conectar usuario de TikTok, ver eventos y probar simulaciones)        |
+|                                                                              |
+|  [OVERLAY PARA OBS]       >>>   http://localhost:3000/overlay                |
+|  (Fondo transparente para agregar como Fuente de Navegador en OBS Studio)    |
+|                                                                              |
++------------------------------------------------------------------------------+
+
+
+================================================================================
+>>> USO DIARIO: LO QUE DEBES HACER CADA DIA PARA TRANSMITIR (30 SEGUNDOS)
+================================================================================
+
+1. Abre la carpeta del proyecto en tu explorador de archivos de Windows.
+
+2. En la barra de direccion de la carpeta (arriba donde dice la ruta de carpetas),
+   haz clic, escribe:
+       cmd
+   y presiona ENTER.
+   (Esto abrira la terminal negra ubicada exactamente en la carpeta del proyecto).
+
+3. En la consola, escribe UNICAMENTE este comando:
+
+       npm run dev
+
+4. Presiona ENTER.
+   Veras el mensaje:
+   "Server running on http://localhost:3000"
+   
+   ¡Y listo! Ya estara funcionando tanto el panel como el overlay en OBS.
+
+* Para apagarlo al terminar tu directo:
+  Presiona Ctrl + C en esa consola o simplemente cierra la ventana.
+
+
+================================================================================
+>>> SI DESCARGASTE EL PROYECTO EN UNA CARPETA NUEVA O EN OTRA PC (SOLO LA 1RA VEZ)
+================================================================================
+
+Si es una carpeta que acabas de descargar de cero (no existe la carpeta node_modules):
+
+1. Abre la terminal en la carpeta (escribe 'cmd' en la barra de direcciones).
+2. Ejecuta este comando para instalar las dependencias:
+
+       npm install --legacy-peer-deps
+
+3. Una vez termine de instalar (demora ~15 segundos), arranca el servidor con:
+
+       npm run dev
+
+* En los dias siguientes ya NO necesitas poner npm install, vas directo al USO DIARIO:
+  'npm run dev' y listo.
+
+
+================================================================================
+>>> CONFIGURACION RAPIDA EN OBS STUDIO
+================================================================================
+
+1. En OBS -> Panel Fuentes -> Clic en [+] -> Selecciona "Navegador" (Browser).
+2. En URL escribe:
+       http://localhost:3000/overlay
+3. En Ancho y Alto coloca tu resolucion:
+   - Formato Horizontal tradicional: Ancho: 1920 | Alto: 1080
+   - Formato Vertical de TikTok:     Ancho: 1080 | Alto: 1920
+4. Marca la casilla: "Actualizar el navegador cuando la escena se active".
+5. Clic en Aceptar. El fondo es 100% transparente.
+================================================================================
