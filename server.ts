@@ -195,6 +195,19 @@ app.get('/api/game/download-backup', (req, res) => {
   return res.status(404).json({ success: false, message: 'No hay base de datos guardada todavía.' });
 });
 
+// Reiniciar base de datos del juego en disco
+app.post('/api/game/reset', (req, res) => {
+  try {
+    if (fs.existsSync(GAME_DB_PATH)) {
+      fs.unlinkSync(GAME_DB_PATH);
+    }
+    return res.json({ success: true, message: 'Game database cleared on disk.' });
+  } catch (err: any) {
+    console.error('Error clearing game_database.json:', err);
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 // 3. Connect to TikTok LIVE
 app.post('/api/tiktok/connect', async (req, res) => {
   const { username, roomId: explicitRoomId } = req.body;

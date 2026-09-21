@@ -23,7 +23,7 @@ import {
   Download,
   Gamepad2,
 } from 'lucide-react';
-import { ConnectionStatus, NormalizedLiveEvent, CumulativeStats } from '../types/tiktok';
+import { ConnectionStatus, NormalizedLiveEvent, CumulativeStats, OverlayBackgroundStyle } from '../types/tiktok';
 import { CommunityState, GameSlot, GameUser, GameEngineEvent } from '../types/game';
 import { TikTokConnector } from '../core/tiktokConnector';
 import { GameEngine } from '../core/gameEngine';
@@ -34,8 +34,8 @@ import { GameEnginePanel } from './GameEnginePanel';
 interface ControlPanelProps {
   connector: TikTokConnector;
   connectionStatus: ConnectionStatus;
-  backgroundStyle: 'dark' | 'transparent' | 'greenscreen';
-  onChangeBackground: (bg: 'dark' | 'transparent' | 'greenscreen') => void;
+  backgroundStyle: OverlayBackgroundStyle;
+  onChangeBackground: (bg: OverlayBackgroundStyle) => void;
   onResetStats: () => void;
   onOpenDocs: () => void;
   isObsCleanView: boolean;
@@ -71,8 +71,8 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
   lastEngineEvent,
   recentEngineEvents,
 }) => {
-  // Pre-fill with requested test account: @ERIC_ACHU
-  const [usernameInput, setUsernameInput] = useState('ERIC_ACHU');
+  // Pre-fill with user's official account: @eric.alexander.30
+  const [usernameInput, setUsernameInput] = useState('eric.alexander.30');
   const [customComment, setCustomComment] = useState('');
   const [autoSimInterval, setAutoSimInterval] = useState(2000);
   const [activeTab, setActiveTab] = useState<'game' | 'debugger' | 'simulation' | 'obs'>('game');
@@ -112,10 +112,11 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
 
   const handleConnectSim = (customName?: string) => {
     setAutoRetry(false);
-    connector.connectSimulation(customName || usernameInput.trim() || 'ERIC_ACHU');
+    connector.connectSimulation(customName || usernameInput.trim() || 'eric.alexander.30');
   };
 
   const handleDisconnect = () => {
+    setAutoRetry(false);
     connector.disconnect();
   };
 
@@ -247,7 +248,7 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
           </div>
 
           <div className="flex items-center gap-2">
-            {connectionStatus.state === 'connected' ? (
+            {connectionStatus.state !== 'disconnected' ? (
               <button
                 type="button"
                 onClick={handleDisconnect}
@@ -259,21 +260,20 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
             ) : (
               <button
                 type="submit"
-                disabled={connectionStatus.state === 'connecting'}
-                className="w-full sm:w-auto px-5 py-2 bg-rose-600 hover:bg-rose-500 text-white rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 shadow-lg shadow-rose-600/30 disabled:opacity-50"
+                className="w-full sm:w-auto px-5 py-2 bg-rose-600 hover:bg-rose-500 text-white rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 shadow-lg shadow-rose-600/30"
               >
                 <Play className="w-3.5 h-3.5" />
-                <span>{connectionStatus.state === 'connecting' ? 'Conectando...' : 'Conectar a TikTok LIVE'}</span>
+                <span>Conectar a TikTok LIVE</span>
               </button>
             )}
 
             <button
               type="button"
-              onClick={() => setUsernameInput('ERIC_ACHU')}
+              onClick={() => setUsernameInput('eric.alexander.30')}
               className="px-2.5 py-2 bg-slate-900 hover:bg-slate-800 border border-slate-700 text-[11px] font-mono text-slate-300 rounded-xl transition"
-              title="Restablecer cuenta de prueba @ERIC_ACHU"
+              title="Restablecer cuenta oficial @eric.alexander.30"
             >
-              @ERIC_ACHU
+              @eric.alexander.30
             </button>
           </div>
         </form>
@@ -288,7 +288,7 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
           </div>
           <button
             type="button"
-            onClick={() => handleConnectSim(usernameInput || 'ERIC_ACHU')}
+            onClick={() => handleConnectSim(usernameInput || 'eric.alexander.30')}
             className="px-2.5 py-1 bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 rounded-lg text-[11px] font-bold transition flex items-center gap-1.5"
           >
             <Sparkles className="w-3 h-3 text-amber-400" />
@@ -301,7 +301,7 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
           <div className="flex items-center gap-1.5">
             <span className="text-slate-400">Streamer:</span>
             <span className="text-white font-bold">
-              {connectionStatus.username ? `@${connectionStatus.username}` : '@ERIC_ACHU'}
+              {connectionStatus.username ? `@${connectionStatus.username}` : '@eric.alexander.30'}
             </span>
           </div>
 
@@ -338,11 +338,11 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-1">
               <button
                 type="button"
-                onClick={() => handleConnectSim(usernameInput || 'ERIC_ACHU')}
+                onClick={() => handleConnectSim(usernameInput || 'eric.alexander.30')}
                 className="w-full py-2 px-3 bg-amber-500/20 hover:bg-amber-500/30 text-amber-200 border border-amber-500/40 rounded-xl text-xs font-bold transition flex items-center justify-center gap-2 shadow-sm"
               >
                 <Sparkles className="w-3.5 h-3.5 text-amber-300" />
-                <span>Simular En Vivo con @{usernameInput || 'ERIC_ACHU'}</span>
+                <span>Simular En Vivo con @{usernameInput || 'eric.alexander.30'}</span>
               </button>
 
               <button
@@ -705,36 +705,48 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
             Ajustes de Fondo y Salida para OBS Studio
           </span>
 
-          <div className="grid grid-cols-3 gap-2">
-            <button
-              onClick={() => onChangeBackground('dark')}
-              className={`p-2.5 rounded-xl text-xs font-semibold flex flex-col items-center gap-1.5 transition ${
-                backgroundStyle === 'dark'
-                  ? 'bg-slate-800 border-2 border-rose-500 text-white shadow'
-                  : 'bg-slate-900 border border-slate-800 text-slate-400'
-              }`}
-            >
-              <div className="w-6 h-6 rounded-lg bg-slate-950 border border-slate-700" />
-              <span>Fondo Oscuro</span>
-            </button>
-
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
             <button
               onClick={() => onChangeBackground('transparent')}
               className={`p-2.5 rounded-xl text-xs font-semibold flex flex-col items-center gap-1.5 transition ${
                 backgroundStyle === 'transparent'
-                  ? 'bg-slate-800 border-2 border-rose-500 text-white shadow'
+                  ? 'bg-slate-800 border-2 border-emerald-500 text-white shadow'
                   : 'bg-slate-900 border border-slate-800 text-slate-400'
               }`}
             >
-              <div className="w-6 h-6 rounded-lg border border-dashed border-slate-500 bg-black/20" />
-              <span>Transparente</span>
+              <div className="w-6 h-6 rounded-lg border border-dashed border-emerald-500 bg-black/20" />
+              <span>Transparente (OBS)</span>
+            </button>
+
+            <button
+              onClick={() => onChangeBackground('mystic')}
+              className={`p-2.5 rounded-xl text-xs font-semibold flex flex-col items-center gap-1.5 transition ${
+                backgroundStyle === 'mystic'
+                  ? 'bg-slate-800 border-2 border-purple-500 text-white shadow'
+                  : 'bg-slate-900 border border-slate-800 text-slate-400'
+              }`}
+            >
+              <div className="w-6 h-6 rounded-lg bg-indigo-950 border border-purple-500" />
+              <span>🌌 Místico</span>
+            </button>
+
+            <button
+              onClick={() => onChangeBackground('minimalist')}
+              className={`p-2.5 rounded-xl text-xs font-semibold flex flex-col items-center gap-1.5 transition ${
+                backgroundStyle === 'minimalist'
+                  ? 'bg-slate-800 border-2 border-cyan-500 text-white shadow'
+                  : 'bg-slate-900 border border-slate-800 text-slate-400'
+              }`}
+            >
+              <div className="w-6 h-6 rounded-lg bg-[#05070D] border border-cyan-500" />
+              <span>🌑 Minimal</span>
             </button>
 
             <button
               onClick={() => onChangeBackground('greenscreen')}
               className={`p-2.5 rounded-xl text-xs font-semibold flex flex-col items-center gap-1.5 transition ${
                 backgroundStyle === 'greenscreen'
-                  ? 'bg-slate-800 border-2 border-rose-500 text-white shadow'
+                  ? 'bg-slate-800 border-2 border-green-500 text-white shadow'
                   : 'bg-slate-900 border border-slate-800 text-slate-400'
               }`}
             >
@@ -747,46 +759,31 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
           <div className="space-y-2 pt-1">
             <button
               onClick={handleCopyVerticalUrl}
-              className="w-full py-2.5 px-3 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-xl text-xs font-semibold text-slate-200 flex items-center justify-between transition"
+              className="w-full py-3 px-3.5 bg-gradient-to-r from-purple-900/60 to-indigo-900/60 hover:from-purple-800/70 hover:to-indigo-800/70 border border-purple-500/40 rounded-xl text-xs font-bold text-purple-100 flex items-center justify-between transition shadow-lg shadow-purple-950/40"
             >
               <span className="flex items-center gap-2">
-                <Laptop className="w-4 h-4 text-emerald-400" />
-                <span>Copiar URL <strong>Vertical 9:16</strong> (1080×1920)</span>
+                <Laptop className="w-4 h-4 text-purple-300" />
+                <span>Copiar URL <strong>Vertical 9:16</strong> (Fondo Místico Activo)</span>
               </span>
               {copiedVerticalUrl ? (
                 <span className="text-emerald-400 flex items-center gap-1 font-bold text-[11px]">
                   <Check className="w-3.5 h-3.5" /> ¡Copiado!
                 </span>
               ) : (
-                <Copy className="w-4 h-4 text-slate-400" />
-              )}
-            </button>
-
-            <button
-              onClick={handleCopyHorizontalUrl}
-              className="w-full py-2.5 px-3 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-xl text-xs font-semibold text-slate-200 flex items-center justify-between transition"
-            >
-              <span className="flex items-center gap-2">
-                <Laptop className="w-4 h-4 text-cyan-400" />
-                <span>Copiar URL <strong>Horizontal 16:9</strong> (1920×1080)</span>
-              </span>
-              {copiedHorizontalUrl ? (
-                <span className="text-cyan-400 flex items-center gap-1 font-bold text-[11px]">
-                  <Check className="w-3.5 h-3.5" /> ¡Copiado!
-                </span>
-              ) : (
-                <Copy className="w-4 h-4 text-slate-400" />
+                <Copy className="w-4 h-4 text-purple-300" />
               )}
             </button>
           </div>
 
           <div className="p-3 bg-slate-900 border border-slate-800 rounded-xl text-[11px] text-slate-400 leading-relaxed space-y-1.5">
-            <p className="font-semibold text-slate-200">Cómo agregarlo en TikTok Studio o en OBS:</p>
-            <ol className="list-decimal pl-4 space-y-1 text-[10px]">
-              <li>En <strong>TikTok Studio</strong>, ve a <strong>Añadir Fuente</strong> &gt; <strong>Enlace (Link / Navegador)</strong>.</li>
-              <li>Pega la URL (usa la Vertical para tu escena 9:16 o la Horizontal si tienes escena 16:9).</li>
-              <li>Configura resolución: <strong>1080 × 1920</strong> (Vertical) o <strong>1920 × 1080</strong> (Horizontal).</li>
-              <li>El fondo transparente se integrará automáticamente sobre tu cámara o juego.</li>
+            <p className="font-semibold text-slate-200">2 Opciones para agregarlo en TikTok LIVE Studio:</p>
+            <ol className="list-decimal pl-4 space-y-1.5 text-[10px]">
+              <li>
+                <strong className="text-white">Opción A (Captura de Ventana - 100% Garantizada):</strong> Abre una ventana de Chrome con <code className="text-purple-300 bg-purple-950/50 px-1 py-0.5 rounded font-mono">http://localhost:3000/?clean=1&layout=vertical&bg=mystic</code>, pulsa <kbd className="text-slate-200 bg-slate-800 px-1 rounded">F11</kbd> para pantalla completa, y en TikTok Studio selecciona <em>Añadir Fuente &gt; Captura de Ventana</em>.
+              </li>
+              <li>
+                <strong className="text-white">Opción B (Fuente de Enlace):</strong> En TikTok Studio ve a <em>Añadir Fuente &gt; Enlace (Navegador)</em>, pega la URL vertical y pon resolución <strong>1080 × 1920</strong>.
+              </li>
             </ol>
           </div>
 

@@ -59,6 +59,7 @@ export const GameEnginePanel: React.FC<GameEnginePanelProps> = ({
   const [filterSlots, setFilterSlots] = useState<'all' | 'occupied' | 'empty'>('all');
   const [isSavingFile, setIsSavingFile] = useState(false);
   const [savedSuccess, setSavedSuccess] = useState(false);
+  const [showResetConfirm, setShowResetConfirm] = useState(false);
 
   const activeMission = communityState.activeMission;
   const lastCommand = gameEngine.getLastCommandResult();
@@ -165,9 +166,7 @@ export const GameEnginePanel: React.FC<GameEnginePanelProps> = ({
 
             <button
               onClick={() => {
-                if (confirm('¿Deseas reiniciar los datos del juego (slots y usuarios guardados)?')) {
-                  gameEngine.resetGameData();
-                }
+                setShowResetConfirm(true);
               }}
               className="flex items-center gap-1.5 text-xs text-slate-400 hover:text-rose-400 transition-colors px-2.5 py-1.5 rounded-lg border border-slate-800 hover:border-rose-900/50"
               title="Reiniciar progreso"
@@ -177,6 +176,36 @@ export const GameEnginePanel: React.FC<GameEnginePanelProps> = ({
             </button>
           </div>
         </div>
+
+        {/* Modal / Diálogo de Confirmación de Reinicio */}
+        {showResetConfirm && (
+          <div className="mb-4 p-4 bg-rose-950/40 border border-rose-800/60 rounded-xl flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-rose-200 shadow-lg">
+            <div className="flex items-center gap-2.5">
+              <AlertTriangle className="w-5 h-5 text-rose-400 shrink-0" />
+              <div>
+                <strong className="block text-white">¿Estás seguro de reiniciar los datos del juego?</strong>
+                <span className="text-[11px] text-rose-300/80">Se vaciarán los 100 slots, niveles de usuarios, historial y base de datos.</span>
+              </div>
+            </div>
+            <div className="flex items-center gap-2 shrink-0">
+              <button
+                onClick={() => setShowResetConfirm(false)}
+                className="px-3 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-300 font-semibold"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={() => {
+                  gameEngine.resetGameData();
+                  setShowResetConfirm(false);
+                }}
+                className="px-3 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-500 text-white font-bold shadow-md shadow-rose-950"
+              >
+                Sí, Reiniciar Todo
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* Barra de Progreso / Energía */}
         <div className="space-y-1.5 mb-5">
@@ -338,6 +367,25 @@ export const GameEnginePanel: React.FC<GameEnginePanelProps> = ({
             <p className="text-xs text-slate-400">
               Los espectadores pueden consultar su estado o la meta escribiendo comandos en el chat de TikTok
             </p>
+          </div>
+        </div>
+
+        {/* Configuración Rápida de Anti-Spam / Cooldown */}
+        <div className="bg-slate-950/60 border border-slate-800 rounded-xl p-3 mb-4 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs">
+          <div className="flex items-center gap-2">
+            <ShieldAlert className="w-4 h-4 text-cyan-400 shrink-0" />
+            <div>
+              <div className="font-bold text-slate-200">Protección Anti-Saturación (Cooldown Activo)</div>
+              <div className="text-[10px] text-slate-400">Evita que 100+ espectadores saturen el overlay</div>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 font-mono text-[11px]">
+            <span className="px-2 py-1 rounded bg-slate-900 border border-slate-700 text-cyan-300">
+              Global: {gameEngine.getConfig().commandGlobalCooldownSeconds}s
+            </span>
+            <span className="px-2 py-1 rounded bg-slate-900 border border-slate-700 text-amber-300">
+              Usuario: {gameEngine.getConfig().commandCooldownSeconds}s
+            </span>
           </div>
         </div>
 
@@ -564,13 +612,13 @@ export const GameEnginePanel: React.FC<GameEnginePanelProps> = ({
         </div>
 
         {/* Botones de Acción de Simulación */}
-        <div className="grid grid-cols-2 sm:grid-cols-5 gap-2.5">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
           <button
             onClick={() => handleSimulateAction('join')}
             className="flex items-center justify-center gap-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs py-2 px-3 rounded-lg border border-slate-700 transition-colors"
           >
             <UserPlus className="w-3.5 h-3.5 text-blue-400" />
-            Simulate Join (+5 XP)
+            Unirse (+5 XP)
           </button>
 
           <button
@@ -578,7 +626,7 @@ export const GameEnginePanel: React.FC<GameEnginePanelProps> = ({
             className="flex items-center justify-center gap-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs py-2 px-3 rounded-lg border border-slate-700 transition-colors"
           >
             <MessageSquare className="w-3.5 h-3.5 text-indigo-400" />
-            Comment (+10 XP)
+            Comentario (+10 XP)
           </button>
 
           <button
@@ -586,7 +634,7 @@ export const GameEnginePanel: React.FC<GameEnginePanelProps> = ({
             className="flex items-center justify-center gap-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs py-2 px-3 rounded-lg border border-slate-700 transition-colors"
           >
             <Heart className="w-3.5 h-3.5 text-rose-400" />
-            Send 10 Likes (+10 XP)
+            10 Likes (+10 XP)
           </button>
 
           <button
@@ -596,16 +644,62 @@ export const GameEnginePanel: React.FC<GameEnginePanelProps> = ({
             <Sparkles className="w-3.5 h-3.5 text-teal-400" />
             Follow (+25 XP)
           </button>
+        </div>
 
-          <button
-            onClick={() =>
-              handleSimulateAction('gift', { giftName: 'Rosa de TikTok', diamonds: 10 })
-            }
-            className="flex items-center justify-center gap-1.5 bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 text-xs py-2 px-3 rounded-lg border border-amber-500/30 transition-colors font-medium col-span-2 sm:col-span-1"
-          >
-            <Gift className="w-3.5 h-3.5 text-amber-400" />
-            Send Gift (+200 XP)
-          </button>
+        {/* Regalos con XP proporcional a su valor real de diamantes (20 XP por moneda) */}
+        <div className="mt-3 pt-3 border-t border-slate-800/80">
+          <span className="block text-xs font-semibold text-slate-300 mb-2 flex items-center justify-between">
+            <span className="flex items-center gap-1.5">
+              <Gift className="w-3.5 h-3.5 text-amber-400" />
+              Probar Regalos (XP Proporcional al valor de monedas):
+            </span>
+            <span className="text-[10px] text-amber-300/80 font-mono">1 Moneda = 20 XP</span>
+          </span>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+            <button
+              onClick={() => handleSimulateAction('gift', { giftName: 'Rosa', diamonds: 1 })}
+              className="flex items-center justify-between p-2 bg-slate-800/80 hover:bg-slate-700 text-slate-200 text-xs rounded-lg border border-slate-700 transition-colors"
+            >
+              <span className="flex items-center gap-1.5 truncate">
+                <span>🌹</span>
+                <span className="font-semibold truncate">Rosa</span>
+              </span>
+              <span className="text-[11px] text-amber-300 font-mono font-bold shrink-0">+20 XP</span>
+            </button>
+
+            <button
+              onClick={() => handleSimulateAction('gift', { giftName: 'Corazón de Dedo', diamonds: 5 })}
+              className="flex items-center justify-between p-2 bg-slate-800/80 hover:bg-slate-700 text-slate-200 text-xs rounded-lg border border-slate-700 transition-colors"
+            >
+              <span className="flex items-center gap-1.5 truncate">
+                <span>🫰</span>
+                <span className="font-semibold truncate">Corazón</span>
+              </span>
+              <span className="text-[11px] text-amber-300 font-mono font-bold shrink-0">+100 XP</span>
+            </button>
+
+            <button
+              onClick={() => handleSimulateAction('gift', { giftName: 'Corona de Flores', diamonds: 99 })}
+              className="flex items-center justify-between p-2 bg-slate-800/80 hover:bg-slate-700 text-slate-200 text-xs rounded-lg border border-slate-700 transition-colors"
+            >
+              <span className="flex items-center gap-1.5 truncate">
+                <span>👑</span>
+                <span className="font-semibold truncate">Corona</span>
+              </span>
+              <span className="text-[11px] text-amber-300 font-mono font-bold shrink-0">+1,980 XP</span>
+            </button>
+
+            <button
+              onClick={() => handleSimulateAction('gift', { giftName: 'Galaxia', diamonds: 1000 })}
+              className="flex items-center justify-between p-2 bg-purple-950/40 hover:bg-purple-900/50 text-purple-200 text-xs rounded-lg border border-purple-700/50 transition-colors"
+            >
+              <span className="flex items-center gap-1.5 truncate">
+                <span>🌌</span>
+                <span className="font-bold truncate text-purple-200">Galaxia</span>
+              </span>
+              <span className="text-[11px] text-purple-300 font-mono font-black shrink-0">+20,000 XP</span>
+            </button>
+          </div>
         </div>
 
         <p className="text-[11px] text-slate-400 mt-3">

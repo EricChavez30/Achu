@@ -155,4 +155,8 @@ export interface GameEngineConfig {
   maxSlots: number; // 100 slots
   levels: { level: number; requiredXp: number }[];
   communityXpPerWorldLevel: number;
+  // Anti-Spam & Rate Limiting for Chat Commands
+  commandCooldownSeconds?: number; // Cooldown per user (e.g. 15s)
+  commandGlobalCooldownSeconds?: number; // Global overlay queue cooldown (e.g. 3s)
+  allowCommandsFromVisitors?: boolean; // false = only members with slots can trigger on-screen alerts
 }

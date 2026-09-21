@@ -74,6 +74,7 @@ export interface CumulativeStats {
 
 export type ConnectionMode = 'real' | 'simulation';
 export type ConnectionState = 'disconnected' | 'connecting' | 'connected' | 'error';
+export type OverlayBackgroundStyle = 'dark' | 'transparent' | 'greenscreen' | 'mystic' | 'minimalist';
 
 export interface ConnectionStatus {
   state: ConnectionState;

@@ -6,19 +6,19 @@ import { ArchitectureModal } from './components/ArchitectureModal';
 import { EventProcessor } from './core/eventProcessor';
 import { TikTokConnector } from './core/tiktokConnector';
 import { GameEngine } from './core/gameEngine';
-import { CumulativeStats, NormalizedLiveEvent, ConnectionStatus } from './types/tiktok';
+import { CumulativeStats, NormalizedLiveEvent, ConnectionStatus, OverlayBackgroundStyle } from './types/tiktok';
 import { CommunityState, GameSlot, GameUser, GameEngineEvent, ChatCommandResult } from './types/game';
-import { Radio, Sliders, Maximize2, Sparkles, BookOpen, Smartphone, Monitor, Eye, EyeOff, ShieldCheck } from 'lucide-react';
+import { Radio, Sliders, Maximize2, Sparkles, BookOpen, Smartphone, Monitor, Eye, EyeOff, ShieldCheck, Palette } from 'lucide-react';
 
 export default function App() {
   // Check URL parameters for OBS / TikTok Studio Browser Source mode
   const urlParams = new URLSearchParams(window.location.search);
   const initialClean = urlParams.get('clean') === '1' || urlParams.get('overlay') === '1';
-  const initialBg = (urlParams.get('bg') as 'dark' | 'transparent' | 'greenscreen') || 'dark';
+  const initialBg = (urlParams.get('bg') as OverlayBackgroundStyle) || 'mystic';
   const initialLayout = (urlParams.get('layout') as 'vertical' | 'horizontal') || 'vertical';
 
   const [isObsCleanView, setIsObsCleanView] = useState<boolean>(initialClean);
-  const [backgroundStyle, setBackgroundStyle] = useState<'dark' | 'transparent' | 'greenscreen'>(initialBg);
+  const [backgroundStyle, setBackgroundStyle] = useState<OverlayBackgroundStyle>(initialBg);
   const [overlayLayout, setOverlayLayout] = useState<'vertical' | 'horizontal'>(initialLayout);
   const [overlayStyleMode, setOverlayStyleMode] = useState<'game' | 'classic'>('game');
   const [isDocsOpen, setIsDocsOpen] = useState<boolean>(false);
@@ -110,14 +110,10 @@ export default function App() {
 
   // If in clean TikTok Studio / OBS Browser Source mode, render the chosen overlay
   if (isObsCleanView) {
-    const isHorizontal = overlayLayout === 'horizontal';
     return (
-      <main className="w-screen h-screen flex items-center justify-center overflow-hidden bg-transparent">
-        <div
-          className={`relative w-full h-full ${
-            isHorizontal ? 'max-w-[1920px] max-h-[1080px]' : 'max-w-[1080px] max-h-[1920px]'
-          }`}
-        >
+      <main className="w-screen h-screen overflow-hidden bg-slate-950">
+        {/* Contenedor 100% Pantalla Completa para Captura de Ventana y Browser Source */}
+        <div id="tiktok-live-overlay-screen" className="w-full h-full relative overflow-hidden bg-slate-950">
           {overlayStyleMode === 'game' ? (
             <GameLiveOverlay
               stats={stats}
@@ -125,7 +121,7 @@ export default function App() {
               recentEvents={recentEvents}
               connectionStatus={connectionStatus}
               backgroundStyle={backgroundStyle}
-              layout={overlayLayout}
+              layout="vertical"
               communityState={communityState}
               slots={gameSlots}
               lastEngineEvent={lastEngineEvent}
@@ -142,7 +138,7 @@ export default function App() {
             />
           )}
 
-          {/* Discreet hover exit button for regular browser testing */}
+          {/* Botón discreto para volver al panel de control */}
           <button
             onClick={() => setIsObsCleanView(false)}
             className="fixed bottom-3 right-3 p-2 rounded-full bg-black/60 text-white/40 hover:text-white hover:bg-black/90 transition text-xs opacity-20 hover:opacity-100 z-50 flex items-center gap-1 backdrop-blur"
@@ -208,8 +204,45 @@ export default function App() {
               <span>Lienzo TikTok Studio</span>
             </div>
 
-            {/* Layout switch controls & Safe Zone Toggle */}
-            <div className="flex items-center gap-1.5">
+            {/* Layout switch controls, Background Theme Selector & Safe Zone Toggle */}
+            <div className="flex flex-wrap items-center gap-1.5">
+              {/* Selector de Fondo / Tema */}
+              <div className="flex items-center gap-1 bg-slate-900 border border-slate-800 p-1 rounded-xl">
+                <button
+                  onClick={() => setBackgroundStyle('mystic')}
+                  className={`px-2 py-1 rounded-lg text-[11px] font-semibold transition ${
+                    backgroundStyle === 'mystic'
+                      ? 'bg-purple-500/20 text-purple-300 border border-purple-500/40 font-bold'
+                      : 'text-slate-400 hover:text-white'
+                  }`}
+                  title="Fondo Fantasía Mística"
+                >
+                  🌌 Místico
+                </button>
+                <button
+                  onClick={() => setBackgroundStyle('minimalist')}
+                  className={`px-2 py-1 rounded-lg text-[11px] font-semibold transition ${
+                    backgroundStyle === 'minimalist'
+                      ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 font-bold'
+                      : 'text-slate-400 hover:text-white'
+                  }`}
+                  title="Fondo Minimalista Oscuro"
+                >
+                  🌑 Minimal
+                </button>
+                <button
+                  onClick={() => setBackgroundStyle('transparent')}
+                  className={`px-2 py-1 rounded-lg text-[11px] font-semibold transition ${
+                    backgroundStyle === 'transparent'
+                      ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 font-bold'
+                      : 'text-slate-400 hover:text-white'
+                  }`}
+                  title="Fondo Transparente para OBS"
+                >
+                  🔳 Transp.
+                </button>
+              </div>
+
               {overlayLayout === 'vertical' && (
                 <button
                   onClick={() => setShowSafeZoneGuides(!showSafeZoneGuides)}
@@ -221,7 +254,7 @@ export default function App() {
                   title="Mostrar u ocultar zonas reservadas de la app nativa de TikTok"
                 >
                   <ShieldCheck className="w-3.5 h-3.5 text-amber-400" />
-                  <span>{showSafeZoneGuides ? 'Ocultar Guías' : 'Ver Zonas TikTok'}</span>
+                  <span>{showSafeZoneGuides ? 'Ocultar Guías' : 'Guías TikTok'}</span>
                 </button>
               )}
 

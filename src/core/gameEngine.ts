@@ -59,6 +59,8 @@ export class GameEngine {
   private lastEngineEvent: GameEngineEvent | null = null;
   private lastActiveUser: GameUser | null = null;
   private lastCommandResult: ChatCommandResult | null = null;
+  private userCommandCooldowns: Map<string, number> = new Map(); // userId -> lastExecutionTimestamp
+  private lastGlobalCommandTimestamp: number = 0;
   private feverTimer: any = null;
   private listeners: Set<GameEngineListener> = new Set();
 
@@ -642,17 +644,51 @@ export class GameEngine {
       localStorage.removeItem(STORAGE_USERS_KEY);
       localStorage.removeItem(STORAGE_SLOTS_KEY);
       localStorage.removeItem(STORAGE_COMMUNITY_KEY);
+      localStorage.removeItem(STORAGE_MODERATION_KEY);
+      fetch('/api/game/reset', { method: 'POST' }).catch(() => {});
     }
 
     this.notifyListeners();
   }
 
   /**
-   * Procesa comandos de chat ingresados por los espectadores
+   * Procesa comandos de chat ingresados por los espectadores con Anti-Spam / Cooldown
    */
-  public handleChatCommand(user: GameUser, rawCommand: string): ChatCommandResult | null {
+  public handleChatCommand(user: GameUser, rawCommand: string, bypassCooldown: boolean = false): ChatCommandResult | null {
     const parts = rawCommand.toLowerCase().split(/\s+/);
     const cmd = parts[0];
+
+    // Verificar si el comando es reconocido
+    const validCommands = ['!slot', '!slots', '!lugar', '!nivel', '!level', '!rank', '!xp', '!meta', '!mision', '!goal', '!top', '!miembros', '!members', '!comandos', '!ayuda', '!help'];
+    if (!validCommands.includes(cmd)) {
+      return null;
+    }
+
+    // Regla 1: Si allowCommandsFromVisitors está deshabilitado, sólo miembros con slot pueden activar comandos en pantalla
+    if (this.config.allowCommandsFromVisitors === false && user.status !== 'MEMBER') {
+      return null;
+    }
+
+    const now = Date.now();
+
+    // Regla 2: Cooldown global (evitar que múltiples comandos se pisen en pantalla en menos de X segundos)
+    const globalCdMs = (this.config.commandGlobalCooldownSeconds ?? 4) * 1000;
+    if (!bypassCooldown && (now - this.lastGlobalCommandTimestamp) < globalCdMs) {
+      // Descartar suavemente para no saturar el overlay
+      return null;
+    }
+
+    // Regla 3: Cooldown individual por usuario (ej: 15 segundos entre comandos de la misma persona)
+    const userCdMs = (this.config.commandCooldownSeconds ?? 15) * 1000;
+    const lastUserExec = this.userCommandCooldowns.get(user.id) || 0;
+    if (!bypassCooldown && (now - lastUserExec) < userCdMs) {
+      // Usuario spameando antes de su tiempo
+      return null;
+    }
+
+    // Registrar timestamps de ejecución exitosa
+    this.lastGlobalCommandTimestamp = now;
+    this.userCommandCooldowns.set(user.id, now);
 
     let response = '';
     let detail = '';
@@ -757,12 +793,12 @@ export class GameEngine {
   }
 
   /**
-   * Ejecuta un comando simulado desde el panel
+   * Ejecuta un comando simulado desde el panel (omite cooldown para pruebas directas del streamer)
    */
-  public executeChatCommand(username: string, commandText: string): ChatCommandResult | null {
+  public executeChatCommand(username: string, commandText: string, bypassCooldown: boolean = true): ChatCommandResult | null {
     const cleanUser = username.trim().replace(/^@/, '');
     const { user } = this.getOrCreateUser(cleanUser.toLowerCase(), cleanUser);
-    return this.handleChatCommand(user, commandText.trim());
+    return this.handleChatCommand(user, commandText.trim(), bypassCooldown);
   }
 
   /**

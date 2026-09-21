@@ -1,14 +1,23 @@
 import React from 'react';
 import { Heart, Gift, MessageSquare, UserPlus, Users, Radio, Sparkles } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { NormalizedLiveEvent, CumulativeStats, ConnectionStatus, GiftEventData, LikeEventData, CommentEventData } from '../types/tiktok';
+import {
+  NormalizedLiveEvent,
+  CumulativeStats,
+  ConnectionStatus,
+  GiftEventData,
+  LikeEventData,
+  CommentEventData,
+  OverlayBackgroundStyle,
+} from '../types/tiktok';
+import bgMysticImage from '../assets/images/bg_mystic_fantasy_1790020264709.jpg';
 
 interface VerticalOverlayProps {
   stats: CumulativeStats;
   lastEvent: NormalizedLiveEvent | null;
   recentEvents: NormalizedLiveEvent[];
   connectionStatus: ConnectionStatus;
-  backgroundStyle: 'dark' | 'transparent' | 'greenscreen';
+  backgroundStyle: OverlayBackgroundStyle;
   compactMode?: boolean;
 }
 
@@ -25,6 +34,10 @@ export const VerticalOverlay: React.FC<VerticalOverlayProps> = ({
         return 'bg-transparent text-white';
       case 'greenscreen':
         return 'bg-[#00FF00] text-black';
+      case 'mystic':
+        return 'bg-slate-950 text-white';
+      case 'minimalist':
+        return 'bg-[#05070D] text-white';
       case 'dark':
       default:
         return 'bg-gradient-to-b from-[#0B0F19] via-[#0D1322] to-[#080B12] text-white';
@@ -35,13 +48,29 @@ export const VerticalOverlay: React.FC<VerticalOverlayProps> = ({
     <div
       id="obs-canvas-9-16"
       className={`relative w-full h-full flex flex-col justify-between overflow-hidden font-sans select-none ${getBgClass()}`}
-      style={{
-        aspectRatio: '9/16',
-      }}
     >
+      {/* Mystic fantasy background */}
+      {backgroundStyle === 'mystic' && (
+        <div className="absolute inset-0 pointer-events-none overflow-hidden z-0">
+          <img
+            src={bgMysticImage}
+            alt="Mystic Background"
+            className="w-full h-full object-cover object-center opacity-85 scale-105 filter brightness-90 contrast-110"
+          />
+          <div className="absolute inset-0 bg-gradient-to-b from-slate-950/85 via-slate-950/40 to-slate-950/95" />
+        </div>
+      )}
+
+      {/* Minimalist dark background */}
+      {backgroundStyle === 'minimalist' && (
+        <div className="absolute inset-0 pointer-events-none z-0 bg-[#05070D]">
+          <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-slate-900/60 via-[#05070D] to-[#020306]" />
+        </div>
+      )}
+
       {/* Subtle overlay ambient gradients if dark mode */}
       {backgroundStyle === 'dark' && (
-        <div className="absolute inset-0 pointer-events-none overflow-hidden">
+        <div className="absolute inset-0 pointer-events-none overflow-hidden z-0">
           <div className="absolute -top-24 -left-24 w-80 h-80 bg-rose-500/10 rounded-full blur-3xl" />
           <div className="absolute top-1/3 -right-24 w-80 h-80 bg-cyan-500/10 rounded-full blur-3xl" />
           <div className="absolute -bottom-24 left-1/4 w-80 h-80 bg-indigo-500/10 rounded-full blur-3xl" />

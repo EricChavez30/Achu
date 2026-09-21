@@ -193,14 +193,14 @@ export class TikTokConnector {
       this.eventSource = null;
     }
 
-    // Notificar al backend si estaba en modo real
-    if (this.status.mode === 'real' && this.status.state !== 'disconnected') {
-      fetch('/api/tiktok/disconnect', { method: 'POST' }).catch(() => {});
-    }
+    // Notificar al backend de inmediato para cerrar cualquier socket Webcast abierto
+    fetch('/api/tiktok/disconnect', { method: 'POST' }).catch(() => {});
 
     this.updateStatus({
       state: 'disconnected',
       errorMessage: undefined,
+      username: '',
+      roomId: undefined,
     });
   }
 

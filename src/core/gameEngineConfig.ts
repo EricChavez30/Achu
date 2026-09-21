@@ -28,4 +28,9 @@ export const DEFAULT_GAME_CONFIG: GameEngineConfig = {
 
   // Community progress per world level
   communityXpPerWorldLevel: 1000,
+
+  // Anti-Spam / Cooldown para comandos de chat
+  commandCooldownSeconds: 15, // 15 segundos entre comandos del mismo usuario
+  commandGlobalCooldownSeconds: 4, // 4 segundos entre alertas en pantalla
+  allowCommandsFromVisitors: true, // Permitir a visitantes consultar progreso
 };

@@ -1,210 +1,157 @@
-# TikTok LIVE Event Listener & Overlay Prototype
+# 🚀 Guía Definitiva Paso a Paso: TikTok LIVE Overlay & Game Engine
 
-Prototipo experimental para la recepción y visualización de eventos en tiempo real desde **TikTok LIVE** mediante un conector de eventos, orientado a ejecución local en **Windows** y visualización 9:16 en **OBS Studio**.
-
-> ⚠️ **AVISO LEGAL Y ARQUITECTÓNICO IMPORTANTE:**  
-> Este prototipo utiliza la librería comunitaria de código abierto **`tiktok-live-connector`**, la cual se basa en **ingeniería inversa (reverse engineering)** del protocolo interno Webcast de TikTok.  
-> - **NO** utiliza APIs oficiales ni propietarias de TikTok (TikTok for Developers no ofrece actualmente una API pública gratuita para leer eventos de directos de terceros).
-> - **NO** requiere contraseñas, tokens de desarrollador, cookies privadas ni credenciales para conectarse a directos públicos.
-> - Solo se necesita el nombre de usuario público del streamer (ej: `@ERIC_ACHU`).
+Esta guía está redactada en estricto orden cronológico para cualquier persona que abra el proyecto por primera vez en su ordenador y quiera poner a funcionar el servidor, el overlay y la transmisión en **OBS Studio** y **TikTok LIVE Studio**.
 
 ---
 
-## Flujo Completo del Sistema
+## 📋 Índice Cronológico
 
-```
-TikTok LIVE (Webcast Protobuf)
-       ↓
-tiktok-live-connector (WebSockets)
-       ↓
-Backend Node.js (Express en server.ts)
-       ↓
-Event Processor (Normalización de Eventos)
-       ↓
-SSE (Server-Sent Events: /api/tiktok/stream)
-       ↓
-Frontend React 19 + TypeScript (Vite)
-       ↓
-Event Debugger (50 eventos) / Overlay Vertical 9:16 para OBS
-```
+1. [Paso 1: Requisitos Previos (Antes de empezar)](#paso-1-requisitos-previos)
+2. [Paso 2: Instalación de Dependencias](#paso-2-instalación-de-dependencias)
+3. [Paso 3: Ejecución del Servidor Local](#paso-3-ejecución-del-servidor-local)
+4. [Paso 4: Direcciones URL y Acceso en el Navegador](#paso-4-direcciones-url-y-acceso-en-el-navegador)
+5. [Paso 5: Configuración Paso a Paso en OBS Studio](#paso-5-configuración-paso-a-paso-en-obs-studio)
+6. [Paso 6: Vinculación con TikTok LIVE Studio (Cámara Virtual)](#paso-6-vinculación-con-tiktok-live-studio)
+7. [Paso 7: Conexión al Directo Real y Pruebas](#paso-7-conexión-al-directo-real-y-pruebas)
+8. [Solución de Problemas Frecuentes (FAQ)](#solución-de-problemas-frecuentes-faq)
 
 ---
 
-## Requisitos de Sistema
+## 🛠️ Paso 1: Requisitos Previos
 
-- **Sistema Operativo:** Windows 10 / 11 (o macOS / Linux)
-- **Node.js:** Versión LTS recomendada: **Node.js v20.x o v22.x** (Mínimo Node.js 18.0.0+)
-- **Navegador:** Chrome, Edge, Firefox, Brave
-- **Software de Streaming (Opcional):** OBS Studio (para captura Browser Source)
+Antes de ejecutar los comandos, asegúrate de tener instalado en tu computadora:
 
----
-
-## Estructura Completa del Proyecto
-
-```
-tiktok-live-overlay-prototype/
-│
-├── server.ts                     # Backend Node.js (Express + tiktok-live-connector + SSE + Vite)
-├── package.json                  # Dependencias y scripts npm (dev, build, start, lint)
-├── iniciar-en-windows.bat        # Script de 1 solo clic para Windows (npm install && npm run dev)
-├── vite.config.ts                # Configuración de compilación Vite
-├── tsconfig.json                 # Configuración del compilador TypeScript
-├── index.html                    # Entry point HTML para navegador y OBS
-├── README.md                     # Esta documentación técnica completa
-│
-├── src/
-│   ├── main.tsx                  # Punto de entrada de React 19
-│   ├── App.tsx                   # Componente principal con tabs y visualizador
-│   ├── index.css                 # Estilos globales con Tailwind CSS v4
-│   │
-│   ├── types/
-│   │   └── tiktok.ts             # Tipos TypeScript: NormalizedLiveEvent, LikeEventData, etc.
-│   │
-│   ├── core/
-│   │   ├── tiktokConnector.ts    # Controlador de conexión Frontend (Real vía SSE y Simulación)
-│   │   ├── eventProcessor.ts     # Normalizador de eventos, contadores acumulativos e historial
-│   │   ├── simulationEngine.ts   # Generador de eventos sintéticos para pruebas sin conexión
-│   │   └── gameStateStub.ts      # Stub desacoplado para futura lógica de juego
-│   │
-│   └── components/
-│       ├── ControlPanel.tsx      # Barra de controles, conexión @username, auto-reintento
-│       ├── EventDebugger.tsx     # Depurador de los últimos 50 eventos (badge REAL vs SIMULACIÓN)
-│       ├── VerticalOverlay.tsx   # Canvas 9:16 para OBS con contadores, regalos y chat en vivo
-│       └── ArchitectureModal.tsx # Modal con diagrama de arquitectura técnica
-```
+1. **Node.js (Versión 18, 20 o 22 recomendada)**:
+   - Descárgalo gratis desde [https://nodejs.org](https://nodejs.org) (Versión LTS).
+   - Durante la instalación, marca la opción por defecto para que agregue Node a tu `PATH`.
+2. **OBS Studio**:
+   - Descárgalo desde [https://obsproject.com](https://obsproject.com).
+3. **TikTok LIVE Studio** (o tu cuenta de TikTok con acceso a directos en PC).
 
 ---
 
-## Cómo Ejecutar en Windows
+## 📦 Paso 2: Instalación de Dependencias
 
-### Método A (El más fácil: 1 Clic):
-1. Haz doble clic en el archivo **`iniciar-en-windows.bat`**.
-2. El script verificará Node.js, instalará dependencias si es la primera vez y arrancará el servidor en `http://localhost:3000`.
+Abre una ventana de consola (`PowerShell` o `Símbolo del sistema / CMD`) dentro de la carpeta del proyecto.
 
-### Método B (Línea de comandos):
-Abre una terminal (`cmd` o `PowerShell`) en la carpeta del proyecto y ejecuta:
+> 💡 **Truco rápido en Windows:** Entra en la carpeta del proyecto, haz clic en la barra de direcciones superior de la carpeta, escribe `cmd` y presiona **Enter**.
+
+Ejecuta el siguiente comando para descargar e instalar todas las librerías:
 
 ```bash
-# 1. Instalar dependencias
 npm install
+```
 
-# 2. Iniciar el servidor local
+*(Este paso se realiza una sola vez. Tardará entre 10 y 30 segundos).*
+
+---
+
+## ⚡ Paso 3: Ejecución del Servidor Local
+
+Una vez finalizada la instalación, ejecuta el servidor con el siguiente comando:
+
+```bash
 npm run dev
 ```
 
-Ambos comandos inician el servidor full-stack en un solo proceso con recarga automática.
-
----
-
-## URL Local para Abrir
-
-Una vez iniciado el servidor, abre en tu navegador:
-```
-http://localhost:3000
-```
-
-Para agregarlo a **OBS Studio**:
-1. Agrega una fuente tipo **Navegador (Browser Source)**.
-2. URL: `http://localhost:3000?clean=1&bg=transparent`
-3. Ancho: `1080`
-4. Alto: `1920`
-
----
-
-## Cómo Conectar a la Cuenta de Prueba: @ERIC_ACHU
-
-1. En el campo de texto de la barra superior verás preconfigurado:
-   ```
-   ERIC_ACHU
-   ```
-   *(También puedes escribir `@ERIC_ACHU` o pegar la URL completa del directo: `https://www.tiktok.com/@ERIC_ACHU/live`)*.
-2. Haz clic en el botón verde **"Conectar a TikTok LIVE"**.
-3. El estado cambiará a **CONECTANDO A TIKTOK...**.
-4. Si el streamer está en directo, pasará a **CONECTADO (TIKTOK LIVE)** y mostrará el `Room ID` numérico real.
-
----
-
-## Logs en la Terminal de Node.js
-
-Durante la ejecución verás logs claros y descriptivos en la consola:
-
+Verás un mensaje en la consola que indica:
 ```text
-[TikTok] Connecting to @ERIC_ACHU...
-[TikTok] Connected
-[TikTok] Room ID: 7412345678901234567
-
-[TikTok] CHAT: @juan_perez: "¡Hola Eric buena partida!"
-[TikTok] LIKE: @maria23 sent 15 likes (Total: 450)
-[TikTok] GIFT: @carlos_pro sent Rosa x5 (💎 5 diamonds)
-[TikTok] FOLLOW: @nuevo_seguidor started following
-[TikTok] VIEWERS: 142 live viewers
+Servidor TikTok LIVE Webcast corriendo en http://localhost:3000
 ```
 
----
+> ⚠️ **IMPORTANTE:** Mantén esta ventana de consola **abierta** mientras estés usando la aplicación o transmitiendo. Si cierras la consola, el servidor se apagará.
 
-## Cómo Distinguir Eventos REALES vs SIMULACIÓN
-
-En el **Event Debugger**:
-- Los eventos de un stream real llevan una insignia roja: **`TIKTOK LIVE REAL`** (con pulso activo).
-- Los eventos simulados llevan una insignia ámbar: **`SIMULACIÓN`**.
-- Puedes filtrar la lista seleccionando **"TikTok Real"** o **"Simulación"** en la barra de filtros.
+*(En Windows también puedes simplemente hacer doble clic en el archivo `iniciar-en-windows.bat` y este ejecutará la instalación y el arranque automáticamente).*
 
 ---
 
-## Qué Hacer si Aparece un Error
+## 🌐 Paso 4: Direcciones URL y Acceso en el Navegador
 
-1. **"Failed to retrieve Room ID from all sources" / El streamer no está online:**
-   - Significa que `@ERIC_ACHU` **no ha iniciado sesión de transmisión en directo en TikTok en este momento**.
-   - TikTok no genera sockets ni eventos para canales fuera de línea.
-   - **Solución:** Haz clic en **"Simular En Vivo con @ERIC_ACHU"** para probar la interfaz y el Event Debugger inmediatamente, o activa el interruptor **"Auto-reintentar"** para que se conecte solo en cuanto empiece a emitir.
+Abre tu navegador (Google Chrome, Microsoft Edge o Brave) y utiliza las siguientes direcciones según lo que necesites:
 
-2. **Bloqueo de IP (429 / Captcha):**
-   - Ocurre comúnmente en plataformas cloud (como Google Cloud Run) debido a las defensas de TikTok contra centros de datos.
-   - **Solución:** Ejecuta la aplicación localmente en tu computadora con Windows usando tu conexión a internet de casa mediante `iniciar-en-windows.bat`.
-
-3. **Node.js no reconocido:**
-   - Instala Node.js v20 LTS o v22 LTS desde [nodejs.org](https://nodejs.org).
-
----
-
-## Comandos de Chat Disponibles para los Espectadores
-
-El Game Engine detecta automáticamente cuando un espectador escribe un comando en el chat del directo de TikTok (o en el simulador) y genera una respuesta inmediata en el overlay:
-
-| Comando | Aliases alternativos | Descripción y Efecto |
+| Propósito | Dirección URL | Descripción |
 | :--- | :--- | :--- |
-| `!slot` | `!slots`, `!lugar` | Muestra el número de slot oficial del usuario si ya es **MEMBER** (ej: `#12`), o indica cuántos XP le faltan para desbloquear su slot. |
-| `!nivel` | `!level`, `!rank`, `!xp` | Muestra el nivel actual del espectador, su XP acumulado y su total de interacciones registradas. |
-| `!meta` | `!mision`, `!goal` | Muestra el progreso de la misión comunitaria activa (ej: Likes alcanzados) y el tiempo restante o recompensa de la Fiebre XP. |
-| `!top` | `!ranking`, `!mejores` | Lista a los miembros con mayor nivel o mayor cantidad de XP en la comunidad. |
-| `!comandos` | `!help`, `!ayuda` | Despliega la lista rápida de comandos disponibles en el directo. |
+| **Panel de Control Completo** | `http://localhost:3000/` | Panel interactivo donde colocas tu `@usuario` de TikTok, ves los logs, activas simulaciones y controlas el juego. |
+| **Overlay Limpio (Vertical 9:16)** | `http://localhost:3000/?clean=1&layout=vertical&bg=mystic` | **Esta es la URL principal para OBS**. Carga únicamente la pantalla vertical con el fondo místico y las tarjetas nítidas sin botones del panel. |
+| **Overlay Fondo Transparente** | `http://localhost:3000/?clean=1&layout=vertical&bg=transparent` | Ideal si quieres poner el juego o tu cámara real detrás del overlay en OBS. |
+| **Overlay Horizontal (16:9)** | `http://localhost:3000/?clean=1&layout=horizontal&bg=mystic` | Versión para pantallas panorámicas 1920×1080. |
 
 ---
 
-## Sistema de Moderación y Filtro de Seguridad Automático
+## 🎬 Paso 5: Configuración Paso a Paso en OBS Studio
 
-Para garantizar una comunidad limpia y libre de toxicidad, el sistema cuenta con un motor de moderación multicapa (`/src/core/moderation.ts`):
+Para que el overlay se vea a resolución completa (1080×1920) y con la máxima nitidez:
 
-1. **Normalización y Detección de Evasión (Anti-Leetspeak):**
-   - Transforma caracteres que buscan burlar filtros (ej: `4` → `a`, `0` → `o`, `3` → `e`, `1` → `i`, `$`, `@`, etc.).
-   - Remueve símbolos interpuestos y espacios artificiales antes de verificar coincidencias.
-
-2. **Categorías Bloqueadas:**
-   - **Términos de Odio y Racismo:** Bloqueo fulminante.
-   - **Contenido Sexual / Acoso:** Prohibido en nombres y mensajes.
-   - **Violencia e Insultos Graves:** Rechazo inmediato.
-
-3. **Acciones del Motor:**
-   - **Nombres inapropiados:** El usuario no ingresa a la comunidad (`FLAGGED_BLOCKED`), se le deniega ganar XP y no se le asigna ninguna de las 100 slots.
-   - **Comentarios ofensivos:** El comentario es ignorado en el Game Engine (no otorga XP ni ejecuta comandos) y queda registrado en el **Registro de Auditoría**.
-   - **Aprobación Previa (Opcional):** El streamer puede activar el interruptor `Aprobación previa: ON` en el panel de control para autorizar manualmente a los usuarios antes de que ocupen un slot de Member.
-   - **Botón de Expulsión/Liberación:** En el panel se puede expulsar a cualquier usuario con un clic, liberando inmediatamente su slot para otro espectador.
+1. **Abre OBS Studio**.
+2. **Configura el lienzo en formato vertical**:
+   - Ve a **Ajustes** (esquina inferior derecha) > **Video**.
+   - **Resolución de la base (Lienzo):** Escribe `1080x1920`.
+   - **Resolución de salida (Escalada):** Escribe `1080x1920`.
+   - Haz clic en **Aceptar**.
+3. **Añade la fuente del Overlay**:
+   - En el panel inferior **Fuentes**, haz clic en el botón `+` y selecciona **Navegador (Browser Source)**.
+   - Nómbralo como quieras (ejemplo: `Overlay TikTok`).
+   - En la ventana que aparece, configura exactamente esto:
+     - **URL:** `http://localhost:3000/?clean=1&layout=vertical&bg=mystic`
+     - **Ancho (Width):** `1080`
+     - **Alto (Height):** `1920`
+     - **Controlar audio vía OBS:** Desmarcado (opcional).
+   - Haz clic en **Aceptar**.
+4. **Ajuste automático**:
+   - Haz clic derecho sobre el recuadro rojo en el lienzo de OBS > **Transformar** > **Ajustar a la pantalla** (o presiona `Ctrl + F`).
+5. **Silenciar audio en OBS (Recomendado)**:
+   - En el panel **Mezclador de audio** de OBS, silencia *"Audio del escritorio"* y *"Mic/Aux"* para evitar que el sonido se duplique al pasar a TikTok Studio.
 
 ---
 
-## Modo Fiebre (Fever Mode x2 XP)
+## 📡 Paso 6: Vinculación con TikTok LIVE Studio
 
-- **Activación Automática:** Se activa por 5 minutos (300 segundos) de forma 100% automática en el momento exacto en que la comunidad alcanza la meta del directo (ej: 2,500 likes o la meta de comentarios).
-- **Activación Manual:** El streamer también cuenta con un botón en el panel de control (`Activar Fiebre x2`) para iniciar o detener la Fiebre en cualquier momento que desee premiar a la audiencia.
-- **Alertas Flotantes Automáticas:** El Game Engine dispara alertas visuales que se muestran por sí solas en pantalla cuando un usuario sube de nivel, cuando desbloquea una slot de Member, o cuando se activa la Fiebre.
+Para pasar la imagen perfecta de OBS a TikTok Studio sin lidiar con enlaces bloqueados:
 
+1. **En OBS Studio**:
+   - En el panel de **Controles** (abajo a la derecha), haz clic en **"Iniciar Cámara Virtual"** (Start Virtual Camera).
+2. **En TikTok LIVE Studio**:
+   - Ve a tu escena vertical.
+   - Haz clic en **Añadir fuente (`+`)** > **Cámara**.
+   - En los ajustes de la cámara:
+     - **Cámara:** Selecciona **OBS Virtual Camera**.
+     - **Resolución:** Selecciona **1080×1920** (o 1080p).
+     - **Pestaña "Fondo":** Asegúrate de que el fondo virtual esté en **"Ninguno"** (desactivado).
+     - **Pestaña "Aspecto / General":** Si las letras salen espejadas, pulsa el botón **"Girar / Despejar"** para que el texto se lea al derecho.
+   - Haz clic en **Aplicar**.
+
+¡Listo! El overlay de OBS aparecerá en TikTok Studio a pantalla completa, con los bordes de neón cian/dorados y nitidez total.
+
+---
+
+## 🎮 Paso 7: Conexión al Directo Real y Pruebas
+
+1. Abre en tu navegador el **Panel de Control**: `http://localhost:3000/`.
+2. En la barra superior, escribe tu nombre de usuario de TikTok (ejemplo: `@mi_usuario`) y haz clic en **"Conectar"**.
+3. **Comandos en vivo que tu audiencia puede usar**:
+   - `!slot`: Reclama automáticamente una de las 100 casillas del mundo y muestra su foto de perfil en vivo.
+   - `!nivel`: Muestra el nivel actual del mundo y la energía acumulada.
+   - `!meta`: Informa el porcentaje restante para cumplir el objetivo de Likes/Regalos.
+4. **Eventos automáticos**:
+   - Cada **Like** suma puntos de experiencia (XP) y llena la barra de energía.
+   - Cada **Regalo (Gift)** activa animaciones especiales y añade tiempo de *Fiebre x2 XP*.
+   - Los **Nuevos Seguidores (Follows)** y comentarios se registran en tiempo real.
+
+---
+
+## ❓ Solución de Problemas Frecuentes (FAQ)
+
+### 1. ¿Por qué TikTok LIVE Studio me pide iniciar sesión de Google al poner un enlace?
+TikTok LIVE Studio bloquea direcciones locales `localhost` y los enlaces web de desarrollo tienen protección de cuenta. Por este motivo, el método oficial y estándar utilizado por los streamers es **Cámara Virtual de OBS** (Paso 6).
+
+### 2. ¿Cómo pruebo las animaciones y alertas si todavía no estoy en directo?
+En el **Panel de Control** (`http://localhost:3000/`), en la pestaña **"Simulador de Eventos"**, haz clic en:
+- `+100 Likes`
+- `Simular Regalo (Rosa / Corazón)`
+- `Simular Follow`
+- `Llenar Casillas Automático`
+
+Verás cómo el overlay en OBS y TikTok Studio reacciona inmediatamente en tiempo real.
+
+### 3. ¿Cómo reinicio las estadísticas de la partida o del día?
+En el Panel de Control, ve a la pestaña **"OBS & Integración"** y presiona el botón **"Reiniciar Estadísticas y Contadores"** para volver el mundo a Nivel 1 y vaciar los 100 slots.
