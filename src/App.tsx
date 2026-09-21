@@ -1,75 +1,100 @@
 import { useState, useEffect, useRef } from 'react';
 import { VerticalOverlay } from './components/VerticalOverlay';
+import { GameLiveOverlay } from './components/GameLiveOverlay';
 import { ControlPanel } from './components/ControlPanel';
 import { ArchitectureModal } from './components/ArchitectureModal';
 import { EventProcessor } from './core/eventProcessor';
 import { TikTokConnector } from './core/tiktokConnector';
-import { GameStateStub } from './core/gameStateStub';
+import { GameEngine } from './core/gameEngine';
 import { CumulativeStats, NormalizedLiveEvent, ConnectionStatus } from './types/tiktok';
-import { Radio, Sliders, Maximize2, Minimize2, Sparkles, BookOpen } from 'lucide-react';
+import { CommunityState, GameSlot, GameUser, GameEngineEvent, ChatCommandResult } from './types/game';
+import { Radio, Sliders, Maximize2, Sparkles, BookOpen, Smartphone, Monitor, Eye, EyeOff, ShieldCheck } from 'lucide-react';
 
 export default function App() {
-  // Check URL parameters for OBS Browser Source mode
+  // Check URL parameters for OBS / TikTok Studio Browser Source mode
   const urlParams = new URLSearchParams(window.location.search);
   const initialClean = urlParams.get('clean') === '1' || urlParams.get('overlay') === '1';
   const initialBg = (urlParams.get('bg') as 'dark' | 'transparent' | 'greenscreen') || 'dark';
+  const initialLayout = (urlParams.get('layout') as 'vertical' | 'horizontal') || 'vertical';
 
   const [isObsCleanView, setIsObsCleanView] = useState<boolean>(initialClean);
   const [backgroundStyle, setBackgroundStyle] = useState<'dark' | 'transparent' | 'greenscreen'>(initialBg);
+  const [overlayLayout, setOverlayLayout] = useState<'vertical' | 'horizontal'>(initialLayout);
+  const [overlayStyleMode, setOverlayStyleMode] = useState<'game' | 'classic'>('game');
   const [isDocsOpen, setIsDocsOpen] = useState<boolean>(false);
+  const [showSafeZoneGuides, setShowSafeZoneGuides] = useState<boolean>(false);
 
   // Core singletons
   const eventProcessorRef = useRef<EventProcessor | null>(null);
-  const gameStateRef = useRef<GameStateStub | null>(null);
+  const gameEngineRef = useRef<GameEngine | null>(null);
   const connectorRef = useRef<TikTokConnector | null>(null);
 
   if (!eventProcessorRef.current) {
     eventProcessorRef.current = new EventProcessor();
   }
-  if (!gameStateRef.current) {
-    gameStateRef.current = new GameStateStub();
+  if (!gameEngineRef.current) {
+    gameEngineRef.current = new GameEngine();
   }
   if (!connectorRef.current) {
     connectorRef.current = new TikTokConnector(eventProcessorRef.current);
   }
 
   const processor = eventProcessorRef.current;
-  const gameState = gameStateRef.current;
+  const gameEngine = gameEngineRef.current;
   const connector = connectorRef.current;
 
-  // UI Reactive States
+  // UI Reactive States for TikTok and Events
   const [stats, setStats] = useState<CumulativeStats>(processor.getStats());
   const [lastEvent, setLastEvent] = useState<NormalizedLiveEvent | null>(processor.getLastEvent());
   const [recentEvents, setRecentEvents] = useState<NormalizedLiveEvent[]>(processor.getRecentEvents());
   const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>(connector.getStatus());
 
+  // UI Reactive States for Game Engine
+  const [communityState, setCommunityState] = useState<CommunityState>(gameEngine.getCommunityState());
+  const [gameSlots, setGameSlots] = useState<GameSlot[]>(gameEngine.getSlots());
+  const [lastUser, setLastUser] = useState<GameUser | null>(gameEngine.getLastActiveUser());
+  const [lastEngineEvent, setLastEngineEvent] = useState<GameEngineEvent | null>(gameEngine.getLastEngineEvent());
+  const [recentEngineEvents, setRecentEngineEvents] = useState<GameEngineEvent[]>(gameEngine.getRecentEngineEvents());
+  const [lastCommandResult, setLastCommandResult] = useState<ChatCommandResult | null>(gameEngine.getLastCommandResult());
+
   useEffect(() => {
-    // 1. Subscribe to Event Processor events
+    // 1. Subscribe to Event Processor events (feed real & simulated events into the Game Engine)
     const unsubscribeEvents = processor.subscribe((event, updatedStats) => {
       setLastEvent(event);
       setStats(updatedStats);
       setRecentEvents(processor.getRecentEvents());
 
-      // Update Game state stub without coupling to UI (only if there is a valid event)
+      // Feed event to GameEngine if event exists
       if (event && event.user) {
-        gameState.registerPlayerInteraction(event);
+        gameEngine.processLiveEvent(event);
       }
     });
 
-    // 2. Subscribe to Connection status changes
+    // 2. Subscribe to Game Engine changes
+    const unsubscribeGame = gameEngine.subscribe((updatedCommunity, engineEvent, updatedSlots, updatedLastUser) => {
+      setCommunityState(updatedCommunity);
+      setGameSlots(updatedSlots);
+      setLastUser(updatedLastUser);
+      setLastEngineEvent(engineEvent);
+      setRecentEngineEvents(gameEngine.getRecentEngineEvents());
+      setLastCommandResult(gameEngine.getLastCommandResult());
+    });
+
+    // 3. Subscribe to Connection status changes
     const unsubscribeStatus = connector.onStatusChange((status) => {
       setConnectionStatus(status);
     });
 
     return () => {
       unsubscribeEvents();
+      unsubscribeGame();
       unsubscribeStatus();
     };
   }, []);
 
   const handleResetStats = () => {
     processor.resetStats();
-    gameState.resetGame();
+    gameEngine.resetGameData();
     setStats(processor.getStats());
     setLastEvent(null);
     setRecentEvents([]);
@@ -78,24 +103,44 @@ export default function App() {
   const handleClearEvents = () => {
     processor.clearHistory();
     processor.resetStats();
-    gameState.resetGame();
     setRecentEvents([]);
     setLastEvent(null);
     setStats(processor.getStats());
   };
 
-  // If in clean OBS Browser Source mode, render just the 9:16 overlay
+  // If in clean TikTok Studio / OBS Browser Source mode, render the chosen overlay
   if (isObsCleanView) {
+    const isHorizontal = overlayLayout === 'horizontal';
     return (
       <main className="w-screen h-screen flex items-center justify-center overflow-hidden bg-transparent">
-        <div className="relative w-full h-full max-w-[1080px] max-h-[1920px]">
-          <VerticalOverlay
-            stats={stats}
-            lastEvent={lastEvent}
-            recentEvents={recentEvents}
-            connectionStatus={connectionStatus}
-            backgroundStyle={backgroundStyle}
-          />
+        <div
+          className={`relative w-full h-full ${
+            isHorizontal ? 'max-w-[1920px] max-h-[1080px]' : 'max-w-[1080px] max-h-[1920px]'
+          }`}
+        >
+          {overlayStyleMode === 'game' ? (
+            <GameLiveOverlay
+              stats={stats}
+              lastEvent={lastEvent}
+              recentEvents={recentEvents}
+              connectionStatus={connectionStatus}
+              backgroundStyle={backgroundStyle}
+              layout={overlayLayout}
+              communityState={communityState}
+              slots={gameSlots}
+              lastEngineEvent={lastEngineEvent}
+              lastCommandResult={lastCommandResult}
+              showSafeZoneGuides={showSafeZoneGuides}
+            />
+          ) : (
+            <VerticalOverlay
+              stats={stats}
+              lastEvent={lastEvent}
+              recentEvents={recentEvents}
+              connectionStatus={connectionStatus}
+              backgroundStyle={backgroundStyle}
+            />
+          )}
 
           {/* Discreet hover exit button for regular browser testing */}
           <button
@@ -155,35 +200,92 @@ export default function App() {
 
       {/* Main Workspace Layout */}
       <main className="flex-1 max-w-7xl w-full mx-auto p-4 md:p-6 grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-        {/* Left Column: Vertical 9:16 OBS Canvas Simulator */}
+        {/* Left Column: TikTok Studio / OBS Canvas Simulator */}
         <section className="lg:col-span-6 xl:col-span-5 flex flex-col items-center">
           <div className="w-full flex items-center justify-between mb-2.5 px-1">
-            <div className="flex items-center gap-2 text-xs font-bold text-slate-300 uppercase tracking-wider">
-              <Sparkles className="w-4 h-4 text-rose-400" />
-              <span>Lienzo OBS 9:16 (1080×1920)</span>
+            <div className="flex items-center gap-1.5 text-xs font-bold text-slate-300 uppercase tracking-wider">
+              <Sparkles className="w-4 h-4 text-emerald-400" />
+              <span>Lienzo TikTok Studio</span>
             </div>
-            <span className="text-[11px] text-slate-400 font-mono">
-              Fondo: {backgroundStyle.toUpperCase()}
-            </span>
+
+            {/* Layout switch controls & Safe Zone Toggle */}
+            <div className="flex items-center gap-1.5">
+              {overlayLayout === 'vertical' && (
+                <button
+                  onClick={() => setShowSafeZoneGuides(!showSafeZoneGuides)}
+                  className={`flex items-center gap-1 px-2.5 py-1 rounded-xl text-xs font-semibold transition border ${
+                    showSafeZoneGuides
+                      ? 'bg-amber-500/20 text-amber-300 border-amber-500/40 shadow-sm'
+                      : 'bg-slate-900 text-slate-400 border-slate-800 hover:text-slate-200'
+                  }`}
+                  title="Mostrar u ocultar zonas reservadas de la app nativa de TikTok"
+                >
+                  <ShieldCheck className="w-3.5 h-3.5 text-amber-400" />
+                  <span>{showSafeZoneGuides ? 'Ocultar Guías' : 'Ver Zonas TikTok'}</span>
+                </button>
+              )}
+
+              <div className="flex items-center gap-1 bg-slate-900 border border-slate-800 p-1 rounded-xl">
+                <button
+                  onClick={() => setOverlayLayout('vertical')}
+                  className={`flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold transition ${
+                    overlayLayout === 'vertical'
+                      ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
+                      : 'text-slate-400 hover:text-white'
+                  }`}
+                  title="Formato vertical estándar de TikTok"
+                >
+                  <Smartphone className="w-3 h-3" />
+                  <span>9:16</span>
+                </button>
+
+                <button
+                  onClick={() => setOverlayLayout('horizontal')}
+                  className={`flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold transition ${
+                    overlayLayout === 'horizontal'
+                      ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
+                      : 'text-slate-400 hover:text-white'
+                  }`}
+                  title="Formato horizontal / Pantalla completa"
+                >
+                  <Monitor className="w-3 h-3" />
+                  <span>16:9</span>
+                </button>
+              </div>
+            </div>
           </div>
 
-          {/* 9:16 Framed Container */}
-          <div className="relative w-full max-w-[430px] rounded-[32px] p-2 bg-slate-900 border-2 border-slate-800 shadow-2xl flex flex-col items-center">
-            {/* Aspect ratio frame 9:16 */}
-            <div className="w-full rounded-[24px] overflow-hidden shadow-inner border border-slate-800/80 aspect-[9/16] relative bg-black">
-              <VerticalOverlay
+          {/* Framed Container adapting to 9:16 or 16:9 */}
+          <div
+            className={`relative w-full rounded-[32px] p-2 bg-slate-900 border-2 border-slate-800 shadow-2xl flex flex-col items-center transition-all ${
+              overlayLayout === 'horizontal' ? 'max-w-[560px]' : 'max-w-[420px]'
+            }`}
+          >
+            {/* Aspect ratio frame */}
+            <div
+              className={`w-full rounded-[24px] overflow-hidden shadow-inner border border-slate-800/80 relative bg-black transition-all ${
+                overlayLayout === 'horizontal' ? 'aspect-[16/9]' : 'aspect-[9/16]'
+              }`}
+            >
+              <GameLiveOverlay
                 stats={stats}
                 lastEvent={lastEvent}
                 recentEvents={recentEvents}
                 connectionStatus={connectionStatus}
                 backgroundStyle={backgroundStyle}
+                layout={overlayLayout}
+                communityState={communityState}
+                slots={gameSlots}
+                lastEngineEvent={lastEngineEvent}
+                lastCommandResult={lastCommandResult}
+                showSafeZoneGuides={showSafeZoneGuides}
               />
             </div>
 
-            {/* OBS Dimension Indicator */}
+            {/* Dimension Indicator */}
             <div className="w-full mt-2.5 px-3 py-1.5 rounded-xl bg-slate-950/80 border border-slate-800/60 flex items-center justify-between text-[11px] text-slate-400 font-mono">
-              <span>Resolución nativa: 1080 × 1920</span>
-              <span className="text-emerald-400">Escala responsiva activa</span>
+              <span>{overlayLayout === 'horizontal' ? '1920 × 1080 (16:9 Horizontal)' : '1080 × 1920 (9:16 Vertical)'}</span>
+              <span className="text-emerald-400">TikTok Studio Ready</span>
             </div>
           </div>
         </section>
@@ -202,6 +304,12 @@ export default function App() {
             events={recentEvents}
             stats={stats}
             onClearEvents={handleClearEvents}
+            gameEngine={gameEngine}
+            communityState={communityState}
+            gameSlots={gameSlots}
+            lastUser={lastUser}
+            lastEngineEvent={lastEngineEvent}
+            recentEngineEvents={recentEngineEvents}
           />
         </section>
       </main>

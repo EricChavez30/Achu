@@ -164,3 +164,47 @@ En el **Event Debugger**:
 
 3. **Node.js no reconocido:**
    - Instala Node.js v20 LTS o v22 LTS desde [nodejs.org](https://nodejs.org).
+
+---
+
+## Comandos de Chat Disponibles para los Espectadores
+
+El Game Engine detecta automáticamente cuando un espectador escribe un comando en el chat del directo de TikTok (o en el simulador) y genera una respuesta inmediata en el overlay:
+
+| Comando | Aliases alternativos | Descripción y Efecto |
+| :--- | :--- | :--- |
+| `!slot` | `!slots`, `!lugar` | Muestra el número de slot oficial del usuario si ya es **MEMBER** (ej: `#12`), o indica cuántos XP le faltan para desbloquear su slot. |
+| `!nivel` | `!level`, `!rank`, `!xp` | Muestra el nivel actual del espectador, su XP acumulado y su total de interacciones registradas. |
+| `!meta` | `!mision`, `!goal` | Muestra el progreso de la misión comunitaria activa (ej: Likes alcanzados) y el tiempo restante o recompensa de la Fiebre XP. |
+| `!top` | `!ranking`, `!mejores` | Lista a los miembros con mayor nivel o mayor cantidad de XP en la comunidad. |
+| `!comandos` | `!help`, `!ayuda` | Despliega la lista rápida de comandos disponibles en el directo. |
+
+---
+
+## Sistema de Moderación y Filtro de Seguridad Automático
+
+Para garantizar una comunidad limpia y libre de toxicidad, el sistema cuenta con un motor de moderación multicapa (`/src/core/moderation.ts`):
+
+1. **Normalización y Detección de Evasión (Anti-Leetspeak):**
+   - Transforma caracteres que buscan burlar filtros (ej: `4` → `a`, `0` → `o`, `3` → `e`, `1` → `i`, `$`, `@`, etc.).
+   - Remueve símbolos interpuestos y espacios artificiales antes de verificar coincidencias.
+
+2. **Categorías Bloqueadas:**
+   - **Términos de Odio y Racismo:** Bloqueo fulminante.
+   - **Contenido Sexual / Acoso:** Prohibido en nombres y mensajes.
+   - **Violencia e Insultos Graves:** Rechazo inmediato.
+
+3. **Acciones del Motor:**
+   - **Nombres inapropiados:** El usuario no ingresa a la comunidad (`FLAGGED_BLOCKED`), se le deniega ganar XP y no se le asigna ninguna de las 100 slots.
+   - **Comentarios ofensivos:** El comentario es ignorado en el Game Engine (no otorga XP ni ejecuta comandos) y queda registrado en el **Registro de Auditoría**.
+   - **Aprobación Previa (Opcional):** El streamer puede activar el interruptor `Aprobación previa: ON` en el panel de control para autorizar manualmente a los usuarios antes de que ocupen un slot de Member.
+   - **Botón de Expulsión/Liberación:** En el panel se puede expulsar a cualquier usuario con un clic, liberando inmediatamente su slot para otro espectador.
+
+---
+
+## Modo Fiebre (Fever Mode x2 XP)
+
+- **Activación Automática:** Se activa por 5 minutos (300 segundos) de forma 100% automática en el momento exacto en que la comunidad alcanza la meta del directo (ej: 2,500 likes o la meta de comentarios).
+- **Activación Manual:** El streamer también cuenta con un botón en el panel de control (`Activar Fiebre x2`) para iniciar o detener la Fiebre en cualquier momento que desee premiar a la audiencia.
+- **Alertas Flotantes Automáticas:** El Game Engine dispara alertas visuales que se muestran por sí solas en pantalla cuando un usuario sube de nivel, cuando desbloquea una slot de Member, o cuando se activa la Fiebre.
+

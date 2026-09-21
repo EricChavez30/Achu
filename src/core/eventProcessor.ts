@@ -135,6 +135,11 @@ export class EventProcessor {
         this.stats.eventCounts.follows += 1;
         break;
       }
+      case 'join':
+      case 'member': {
+        // Track user joining
+        break;
+      }
       case 'viewer_count': {
         const data = event.data as ViewerCountData;
         this.stats.currentViewers = data.viewerCount;
@@ -208,6 +213,18 @@ export class EventProcessor {
           isFollow: true,
         };
         return { id, type: 'follow', source, timestamp, user, data, rawPayload: rawData };
+      }
+      case 'member':
+      case 'join': {
+        return {
+          id,
+          type: 'join',
+          source,
+          timestamp,
+          user,
+          data: { joinedAt: timestamp },
+          rawPayload: rawData,
+        };
       }
       case 'roomUser':
       case 'viewer_count': {

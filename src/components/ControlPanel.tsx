@@ -21,11 +21,15 @@ import {
   Laptop,
   RefreshCw,
   Download,
+  Gamepad2,
 } from 'lucide-react';
 import { ConnectionStatus, NormalizedLiveEvent, CumulativeStats } from '../types/tiktok';
+import { CommunityState, GameSlot, GameUser, GameEngineEvent } from '../types/game';
 import { TikTokConnector } from '../core/tiktokConnector';
+import { GameEngine } from '../core/gameEngine';
 import { MOCK_GIFTS } from '../core/simulationEngine';
 import { EventDebugger } from './EventDebugger';
+import { GameEnginePanel } from './GameEnginePanel';
 
 interface ControlPanelProps {
   connector: TikTokConnector;
@@ -39,6 +43,13 @@ interface ControlPanelProps {
   events: NormalizedLiveEvent[];
   stats: CumulativeStats;
   onClearEvents: () => void;
+  // Game Engine props
+  gameEngine: GameEngine;
+  communityState: CommunityState;
+  gameSlots: GameSlot[];
+  lastUser: GameUser | null;
+  lastEngineEvent: GameEngineEvent | null;
+  recentEngineEvents: GameEngineEvent[];
 }
 
 export const ControlPanel: React.FC<ControlPanelProps> = ({
@@ -53,13 +64,18 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
   events,
   stats,
   onClearEvents,
+  gameEngine,
+  communityState,
+  gameSlots,
+  lastUser,
+  lastEngineEvent,
+  recentEngineEvents,
 }) => {
   // Pre-fill with requested test account: @ERIC_ACHU
   const [usernameInput, setUsernameInput] = useState('ERIC_ACHU');
   const [customComment, setCustomComment] = useState('');
   const [autoSimInterval, setAutoSimInterval] = useState(2000);
-  const [copiedUrl, setCopiedUrl] = useState(false);
-  const [activeTab, setActiveTab] = useState<'debugger' | 'simulation' | 'obs'>('debugger');
+  const [activeTab, setActiveTab] = useState<'game' | 'debugger' | 'simulation' | 'obs'>('game');
   const [autoRetry, setAutoRetry] = useState(false);
   const [retryTimer, setRetryTimer] = useState(15);
   const [showWindowsGuide, setShowWindowsGuide] = useState(false);
@@ -103,13 +119,27 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
     connector.disconnect();
   };
 
-  const handleCopyObsUrl = () => {
+  const [copiedVerticalUrl, setCopiedVerticalUrl] = useState(false);
+  const [copiedHorizontalUrl, setCopiedHorizontalUrl] = useState(false);
+
+  const handleCopyVerticalUrl = () => {
     const url = new URL(window.location.href);
     url.searchParams.set('clean', '1');
+    url.searchParams.set('layout', 'vertical');
     url.searchParams.set('bg', backgroundStyle);
     navigator.clipboard.writeText(url.toString());
-    setCopiedUrl(true);
-    setTimeout(() => setCopiedUrl(false), 2000);
+    setCopiedVerticalUrl(true);
+    setTimeout(() => setCopiedVerticalUrl(false), 2000);
+  };
+
+  const handleCopyHorizontalUrl = () => {
+    const url = new URL(window.location.href);
+    url.searchParams.set('clean', '1');
+    url.searchParams.set('layout', 'horizontal');
+    url.searchParams.set('bg', backgroundStyle);
+    navigator.clipboard.writeText(url.toString());
+    setCopiedHorizontalUrl(true);
+    setTimeout(() => setCopiedHorizontalUrl(false), 2000);
   };
 
   // State badge formatting
@@ -400,8 +430,20 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
         </div>
       </div>
 
-      {/* 3. Navigation Tabs: Event Debugger / Simulación / OBS */}
-      <div className="flex items-center gap-1.5 border-b border-slate-800 pb-2">
+      {/* 3. Navigation Tabs: Game Engine / Event Debugger / Simulación / OBS */}
+      <div className="flex flex-wrap items-center gap-1.5 border-b border-slate-800 pb-2">
+        <button
+          onClick={() => setActiveTab('game')}
+          className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition ${
+            activeTab === 'game'
+              ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 shadow-sm'
+              : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800'
+          }`}
+        >
+          <Gamepad2 className="w-3.5 h-3.5 text-emerald-400" />
+          <span>Game Engine & 100 Slots</span>
+        </button>
+
         <button
           onClick={() => setActiveTab('debugger')}
           className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition ${
@@ -435,11 +477,22 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
           }`}
         >
           <Eye className="w-3.5 h-3.5" />
-          <span>Ajustes OBS</span>
+          <span>TikTok Studio / OBS</span>
         </button>
       </div>
 
       {/* 4. Tab Contents */}
+      {activeTab === 'game' && (
+        <GameEnginePanel
+          gameEngine={gameEngine}
+          communityState={communityState}
+          slots={gameSlots}
+          lastUser={lastUser}
+          lastEngineEvent={lastEngineEvent}
+          recentEvents={recentEngineEvents}
+        />
+      )}
+
       {activeTab === 'debugger' && (
         <EventDebugger
           events={events}
@@ -690,31 +743,50 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
             </button>
           </div>
 
-          {/* Copy OBS Browser Source URL */}
-          <button
-            onClick={handleCopyObsUrl}
-            className="w-full py-2.5 px-3 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-xl text-xs font-semibold text-slate-200 flex items-center justify-center gap-2 transition"
-          >
-            {copiedUrl ? (
-              <>
-                <Check className="w-4 h-4 text-emerald-400" />
-                <span className="text-emerald-300 font-bold">¡URL copiada para Browser Source!</span>
-              </>
-            ) : (
-              <>
-                <Copy className="w-4 h-4 text-cyan-400" />
-                <span>Copiar URL para OBS Browser Source (1080×1920)</span>
-              </>
-            )}
-          </button>
+          {/* Copy URLs for TikTok Studio & OBS */}
+          <div className="space-y-2 pt-1">
+            <button
+              onClick={handleCopyVerticalUrl}
+              className="w-full py-2.5 px-3 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-xl text-xs font-semibold text-slate-200 flex items-center justify-between transition"
+            >
+              <span className="flex items-center gap-2">
+                <Laptop className="w-4 h-4 text-emerald-400" />
+                <span>Copiar URL <strong>Vertical 9:16</strong> (1080×1920)</span>
+              </span>
+              {copiedVerticalUrl ? (
+                <span className="text-emerald-400 flex items-center gap-1 font-bold text-[11px]">
+                  <Check className="w-3.5 h-3.5" /> ¡Copiado!
+                </span>
+              ) : (
+                <Copy className="w-4 h-4 text-slate-400" />
+              )}
+            </button>
 
-          <div className="p-3 bg-slate-900 border border-slate-800 rounded-xl text-[11px] text-slate-400 leading-relaxed">
-            <p className="font-semibold text-slate-200 mb-1">Configuración en OBS Studio:</p>
-            <ol className="list-decimal pl-4 space-y-0.5 text-[10px]">
-              <li>Agrega una nueva fuente <strong>Navegador (Browser Source)</strong>.</li>
-              <li>Pega la URL copiada arriba.</li>
-              <li>Establece Ancho: <strong>1080</strong> y Alto: <strong>1920</strong>.</li>
-              <li>Marca la casilla <em>"Apagar la fuente cuando no sea visible"</em> si lo deseas.</li>
+            <button
+              onClick={handleCopyHorizontalUrl}
+              className="w-full py-2.5 px-3 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-xl text-xs font-semibold text-slate-200 flex items-center justify-between transition"
+            >
+              <span className="flex items-center gap-2">
+                <Laptop className="w-4 h-4 text-cyan-400" />
+                <span>Copiar URL <strong>Horizontal 16:9</strong> (1920×1080)</span>
+              </span>
+              {copiedHorizontalUrl ? (
+                <span className="text-cyan-400 flex items-center gap-1 font-bold text-[11px]">
+                  <Check className="w-3.5 h-3.5" /> ¡Copiado!
+                </span>
+              ) : (
+                <Copy className="w-4 h-4 text-slate-400" />
+              )}
+            </button>
+          </div>
+
+          <div className="p-3 bg-slate-900 border border-slate-800 rounded-xl text-[11px] text-slate-400 leading-relaxed space-y-1.5">
+            <p className="font-semibold text-slate-200">Cómo agregarlo en TikTok Studio o en OBS:</p>
+            <ol className="list-decimal pl-4 space-y-1 text-[10px]">
+              <li>En <strong>TikTok Studio</strong>, ve a <strong>Añadir Fuente</strong> &gt; <strong>Enlace (Link / Navegador)</strong>.</li>
+              <li>Pega la URL (usa la Vertical para tu escena 9:16 o la Horizontal si tienes escena 16:9).</li>
+              <li>Configura resolución: <strong>1080 × 1920</strong> (Vertical) o <strong>1920 × 1080</strong> (Horizontal).</li>
+              <li>El fondo transparente se integrará automáticamente sobre tu cámara o juego.</li>
             </ol>
           </div>
 

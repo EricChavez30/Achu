@@ -11,12 +11,26 @@
 
 import express from 'express';
 import path from 'path';
+import fs from 'fs';
 import { createServer as createViteServer } from 'vite';
 
 const app = express();
 const PORT = 3000;
 
-app.use(express.json());
+app.use(express.json({ limit: '10mb' }));
+
+// File-based Game Database persistence path (data/game_database.json)
+const DATA_DIR = path.join(process.cwd(), 'data');
+const GAME_DB_PATH = path.join(DATA_DIR, 'game_database.json');
+
+// Ensure data directory exists
+if (!fs.existsSync(DATA_DIR)) {
+  try {
+    fs.mkdirSync(DATA_DIR, { recursive: true });
+  } catch (err) {
+    console.error('Error creating data directory:', err);
+  }
+}
 
 // List of connected SSE clients
 interface SSEClient {
@@ -48,7 +62,7 @@ async function getWebcastClass() {
       }
       if (rootMod.RouteConfig) {
         // Return clean unsigned URL directly so TikTok doesn't redirect to paid EulerStream service
-        rootMod.RouteConfig.fetchWebcastSignatureFromProvider = async ({ url, userAgent }: any) => {
+        (rootMod.RouteConfig as any).fetchWebcastSignatureFromProvider = async ({ url, userAgent }: any) => {
           return { response: { signedUrl: url, userAgent } };
         };
       }
@@ -130,6 +144,55 @@ app.get('/api/tiktok/status', (req, res) => {
     errorMessage: lastError,
     sseClientsCount: sseClients.length,
   });
+});
+
+// 2b. Game Database File Persistence Endpoints
+// Carga la base de datos completa de usuarios, slots y comunidad desde data/game_database.json
+app.get('/api/game/data', (req, res) => {
+  try {
+    if (fs.existsSync(GAME_DB_PATH)) {
+      const content = fs.readFileSync(GAME_DB_PATH, 'utf-8');
+      const parsed = JSON.parse(content);
+      return res.json({ success: true, exists: true, data: parsed });
+    }
+    return res.json({ success: true, exists: false, data: null });
+  } catch (err: any) {
+    console.error('Error reading game_database.json:', err);
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// Guarda la base de datos completa a disco (data/game_database.json)
+app.post('/api/game/save', (req, res) => {
+  try {
+    const payload = req.body;
+    if (!payload || typeof payload !== 'object') {
+      return res.status(400).json({ success: false, message: 'Invalid game state payload' });
+    }
+
+    const dataToSave = {
+      savedAt: Date.now(),
+      savedAtIso: new Date().toISOString(),
+      users: payload.users || [],
+      slots: payload.slots || [],
+      communityState: payload.communityState || null,
+      version: 1,
+    };
+
+    fs.writeFileSync(GAME_DB_PATH, JSON.stringify(dataToSave, null, 2), 'utf-8');
+    return res.json({ success: true, message: 'Game state saved to file successfully', path: 'data/game_database.json' });
+  } catch (err: any) {
+    console.error('Error writing game_database.json:', err);
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// Descargar archivo de respaldo para el streamer
+app.get('/api/game/download-backup', (req, res) => {
+  if (fs.existsSync(GAME_DB_PATH)) {
+    return res.download(GAME_DB_PATH, `game_database_backup_${Date.now()}.json`);
+  }
+  return res.status(404).json({ success: false, message: 'No hay base de datos guardada todavía.' });
 });
 
 // 3. Connect to TikTok LIVE
@@ -268,6 +331,16 @@ app.post('/api/tiktok/connect', async (req, res) => {
       const author = data.uniqueId || data.user?.displayId || data.user?.uniqueId || data.user?.nickname || data.nickname || 'anonimo';
       console.log(`[TikTok] FOLLOW: @${author} started following`);
       broadcastEvent('follow', {
+        uniqueId: author,
+        nickname: data.nickname || data.user?.nickname || author,
+        profilePictureUrl: data.profilePictureUrl || data.user?.avatarThumb?.urlList?.[0] || '',
+      });
+    });
+
+    connection.on('member', (data: any) => {
+      const author = data.uniqueId || data.user?.displayId || data.user?.uniqueId || data.user?.nickname || data.nickname || 'anonimo';
+      console.log(`[TikTok] JOIN: @${author} joined the stream`);
+      broadcastEvent('member', {
         uniqueId: author,
         nickname: data.nickname || data.user?.nickname || author,
         profilePictureUrl: data.profilePictureUrl || data.user?.avatarThumb?.urlList?.[0] || '',

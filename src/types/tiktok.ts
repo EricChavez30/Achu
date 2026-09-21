@@ -1,10 +1,15 @@
-export type LiveEventType = 'like' | 'gift' | 'comment' | 'follow' | 'viewer_count' | 'share';
+export type LiveEventType = 'like' | 'gift' | 'comment' | 'follow' | 'viewer_count' | 'share' | 'join' | 'member';
 export type EventSourceOrigin = 'real' | 'simulation';
 
 export interface LiveUser {
+  userId?: string;
   uniqueId: string;
   nickname: string;
   profilePictureUrl?: string;
+}
+
+export interface JoinEventData {
+  joinedAt: number;
 }
 
 export interface LikeEventData {
@@ -52,7 +57,7 @@ export interface NormalizedLiveEvent {
   source: EventSourceOrigin; // 'real' = TikTok LIVE real | 'simulation' = Bot/manual
   timestamp: number;
   user: LiveUser;
-  data: LikeEventData | GiftEventData | CommentEventData | FollowEventData | ViewerCountData | ShareEventData;
+  data: LikeEventData | GiftEventData | CommentEventData | FollowEventData | ViewerCountData | ShareEventData | JoinEventData;
   rawPayload?: any; // Payload crudo original para depuración
 }
 

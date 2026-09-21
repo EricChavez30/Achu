@@ -147,6 +147,7 @@ export const VerticalOverlay: React.FC<VerticalOverlayProps> = ({
                     {lastEvent.type === 'gift' && <Gift className="w-3 h-3 text-amber-400 fill-amber-400" />}
                     {lastEvent.type === 'comment' && <MessageSquare className="w-3 h-3 text-cyan-400" />}
                     {lastEvent.type === 'follow' && <UserPlus className="w-3 h-3 text-emerald-400" />}
+                    {lastEvent.type === 'join' && <UserPlus className="w-3 h-3 text-teal-300" />}
                     {lastEvent.type === 'viewer_count' && <Users className="w-3 h-3 text-blue-400" />}
                   </div>
                 </div>
@@ -186,6 +187,11 @@ export const VerticalOverlay: React.FC<VerticalOverlayProps> = ({
                     {lastEvent.type === 'follow' && (
                       <p className="text-xs font-semibold text-emerald-300">
                         ¡Ahora está siguiendo la transmisión! 🎉
+                      </p>
+                    )}
+                    {lastEvent.type === 'join' && (
+                      <p className="text-xs font-semibold text-cyan-300 flex items-center gap-1">
+                        <span>¡Se ha unido al directo! ✨</span>
                       </p>
                     )}
                     {lastEvent.type === 'viewer_count' && (
@@ -340,6 +346,11 @@ export const VerticalOverlay: React.FC<VerticalOverlayProps> = ({
                       {ev.type === 'follow' && (
                         <span className="text-emerald-400 font-medium">
                           ¡Comenzó a seguirte!
+                        </span>
+                      )}
+                      {ev.type === 'join' && (
+                        <span className="text-teal-300 font-medium">
+                          ¡Se unió al directo! ✨
                         </span>
                       )}
                       {ev.type === 'viewer_count' && (
